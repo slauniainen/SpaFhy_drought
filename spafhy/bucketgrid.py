@@ -93,28 +93,28 @@ class BucketGrid(object):
             self.results = {'Infil': [], 'Retflow': [], 'Drain': [], 'Roff': [], 'ET': [],
             'Mbe': [], 'Wliq': [], 'PondSto': [], 'WatStoTop': [], 'Ree': []}
 
-
-    def watbal(self, dt=1, rr=0.0, tr=0.0, evap=0.0, retflow=0.0):
+    def watbal(self, dt=1.0, rr=0.0, tr=0.0, evap=0.0, retflow=0.0):
         """
         Computes 2-layer bucket model water balance for one timestep dt
         Top layer is interception storage and contributes only to evap.
         Lower layer is rootzone and contributes only tr and creates drainage.
         Capillary interaction between layers is neglected and connection from bottom up
         is only in case of excess returnflow.
-        Pond storage can exist above top layer
+        Pond storage can exist above top layer.
         
         IN:
             dt [s]
             rr = potential infiltration [m]
             tr = transpiration from root zone [m]
             evap = evaporation from top layer [m]
-            retflow = return flow [m]
-        OUT:
+            retflow = return flow from ground water [m]
+        OUT: dict with 
             inflow [m] - total inflow to root zone
-            drain [m] - drainage from root zone
             roff [m] - surface runoff
-            et [m] - evapotranspiration
+            drain [m] - drainage from root zone
+            tr [m] - transpiration from root zone
             mbe [m] - mass balance error
+
         """
         gridshape = np.shape(self.Wliq)  # rows, cols
     
@@ -126,49 +126,52 @@ class BucketGrid(object):
         rr0 = rr.copy()
        
         # add current Pond storage to rr & update storage
-        PondSto0 = self.PondSto
+        PondSto0 = self.PondSto.copy()
         rr += self.PondSto
         self.PondSto = np.zeros(gridshape)
         
-        WatSto0 = self.WatSto
-        WatStoTop0 = self.WatStoTop
+        WatSto0 = self.WatSto.copy()
+        WatStoTop0 = self.WatStoTop.copy()
         
         
         #top layer interception & water balance
         interc = np.maximum(0.0, (self.MaxStoTop - self.WatStoTop))\
                     * (1.0 - np.exp(-(rr / self.MaxStoTop)))
-        # to rootzone
-        rr = rr - interc
+        
         self.WatStoTop = np.maximum(0.0, self.WatStoTop + interc)  
         evap = np.minimum(evap, self.WatStoTop)
         self.WatStoTop -= evap
       
+        # infiltration to rootzone
+        rr = rr - interc
+                
         # ********* compute bottom layer (root zone) water balance ***********
-        
-        # drainage: at gridcells where retflow > 0, set drain to zero.
-        # This delays drying of cells which receive water from topmodel storage
-        drain = np.minimum(self.Ksat * dt, np.maximum(0.0, (self.Wliq - self.Fc))*self.D)
-        drain[retflow > 0.0] = 0.0
 
-        # inflow to root zone restricted by potential inflow or available pore space
-        Qin = (retflow + rr)  # m, pot. inflow
-        inflow = np.minimum(Qin, self.MaxWatSto - self.WatSto + drain + tr)
-
-        dSto = (inflow - drain)
-        self.WatSto = np.minimum(self.MaxWatSto, np.maximum(self.WatSto + dSto, eps))
-        
         # transpiration removes water from rootzone
         tr = np.minimum(tr, self.WatSto - eps)
         self.WatSto -= tr
         
+        # drainage: at gridcells where retflow > 0, set drain to zero.
+        # This delays drying of cells which receive water from topmodel storage
+        # ... and removes oscillation of water content at those cells.
+        drain = np.minimum(self.hydrCond() * dt, np.maximum(0.0, (self.Wliq - self.Fc))*self.D)
+        drain[retflow > 0.0] = 0.0
+        
+        # inflow to root zone: restricted by potential inflow or available pore space
+        Qin = (retflow + rr)  # m, pot. inflow
+        inflow = np.minimum(Qin, self.MaxWatSto - self.WatSto + drain)
+        
+        dSto = (inflow - drain)
+        self.WatSto = np.minimum(self.MaxWatSto, np.maximum(self.WatSto + dSto, eps))
+                
         # if inflow excess after filling rootzone, update first top layer storage
-        exfil = Qin - inflow + eps
-        to_top_layer = np.minimum(exfil, self.MaxStoTop - self.WatStoTop + eps)
+        exfil = Qin - inflow
+        to_top_layer = np.minimum(exfil, self.MaxStoTop - self.WatStoTop - eps)
         # self.WatStoTop = self.WatStoTop + to_top_layer
         self.WatStoTop += to_top_layer
         
         # ... and then pond storage ...
-        to_pond = np.minimum(exfil - to_top_layer, self.MaxPond - self.PondSto + eps)
+        to_pond = np.minimum(exfil - to_top_layer, self.MaxPond - self.PondSto - eps)
         self.PondSto += to_pond
  
         # ... and route remaining to surface runoff
@@ -183,23 +186,22 @@ class BucketGrid(object):
         # mass balance error [m]
         mbe = (self.WatSto - WatSto0)  + (self.WatStoTop - WatStoTop0) + (self.PondSto - PondSto0) \
             - (rr0 + retflow - tr - evap - drain - roff)
-        # print('mbe', np.nanmax(mbe))
         
         # append results to lists; use only for testing small grids!
         if hasattr(self, 'results'):
             self.results['Infil'].append(inflow - retflow)   # infiltration through top boundary
             self.results['Retflow'].append(retflow)         # return flow from below 
-            self.results['Roff'].append(roff)
-            self.results['Drain'].append(drain)
-            self.results['ET'].append(tr + evap)
+            self.results['Roff'].append(roff)       # surface runoff
+            self.results['Drain'].append(drain)     # drainage
+            self.results['ET'].append(tr + evap)            
             self.results['Mbe'].append(mbe)
             self.results['Wliq'].append(self.Wliq)
             self.results['PondSto'].append(self.PondSto)
-            self.results['WatStoTop'].append(self.WatStoTop)
+            self.results['Wliq_top'].append(self.Wliq_top)
             self.results['Ree'].append(self.Ree)
         
         return inflow, roff, drain, tr, evap, mbe
-
+    
     def setState(self):
         """ updates state variables"""
         # root zone

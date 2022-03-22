@@ -161,10 +161,13 @@ class SpaFHy():
         self.step_nr = 0
         #Simulation results in netCDF4 file
         self.ncf_file = pgen['ncf_file']
+        
         #SpaFHy state(s) in a pickle file
         self.pickle_file = pgen['pickle_file']
+        
         #For wetness index map the topgraphic map and other raster files in a pikle file
-        self.topographic_map_file=pgen['topographic_map_file']
+        #self.topographic_map_file=pgen['topographic_map_file']
+        
         self.forc_file=pgen['forcing_file']
         self.GisData = gisdata
         self.cmask = self.GisData['cmask']
@@ -332,6 +335,7 @@ def initialize_netCDF(ID, fname, lat0, lon0, dlat, dlon, dtime=None):
     
     # create dataset & dimensions
     directory = os.path.dirname(fname)
+    print(directory)
     if not os.path.exists(directory):
         os.makedirs(directory)
     ncf = Dataset(fname, 'w')
@@ -343,7 +347,7 @@ def initialize_netCDF(ID, fname, lat0, lon0, dlat, dlon, dtime=None):
     ncf.createDimension('dlon', dlon)
     ncf.createDimension('dlat', dlat)
 
-    # create variables into base and groups 'forc','eval','cpy','bu','top'
+
     # call as createVariable(varname,type,(dimensions))
     time = ncf.createVariable('time', 'f8', ('dtime',))
     time.units = "days since 0001-01-01 00:00:00.0"
@@ -411,5 +415,26 @@ def initialize_netCDF(ID, fname, lat0, lon0, dlat, dlon, dtime=None):
     #This addition is for the saturation map
     Sloc = ncf.createVariable('/top/Sloc', 'f4', ('dtime','dlat','dlon',))
     Sloc.units = 'local sat. deficit [m]'
+    
+    # gisdata
+    soilclass = ncf.createVariable('/gis/soilclass', 'f4', ('dlat', 'dlon',))
+    soilclass.units = 'soil type code [int]'
+    twi = ncf.createVariable('/gis/twi', 'f4', ('dlat', 'dlon',))
+    twi.units = 'twi'
+    LAI_conif = ncf.createVariable('/gis/LAI_conif', 'f4', ('dlat', 'dlon',))
+    LAI_conif.units = 'LAI_conif [m2m-2]'
+    LAI_decid = ncf.createVariable('/gis/LAI_decid', 'f4', ('dlat', 'dlon',))
+    LAI_decid.units = 'LAI_decid [m2m-2]'
+    stream = ncf.createVariable('/gis/stream', 'f4', ('dlat', 'dlon',))
+    stream.units = 'stream mask'
+    dem = ncf.createVariable('/gis/dem', 'f4', ('dlat', 'dlon',))
+    dem.units = 'dem'
+    slope = ncf.createVariable('/gis/slope', 'f4', ('dlat', 'dlon',))
+    slope.units = 'slope'
+    flowacc = ncf.createVariable('/gis/flowacc', 'f4', ('dlat', 'dlon',))
+    flowacc.units = 'flowacc'
+    cmask = ncf.createVariable('/gis/cmask', 'f4', ('dlat', 'dlon',))
+    cmask.units = 'cmask'
+    
     print('**** netCDF4 file created ****')
     return ncf, fname

@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 30 10:34:37 2016
@@ -10,6 +11,9 @@ import pandas as pd
 import os
 import configparser
 import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+
+#import seaborn as sns
 # from scipy import interpolate
 
 eps = np.finfo(float).eps  # machine epsilon
@@ -18,7 +22,6 @@ eps = np.finfo(float).eps  # machine epsilon
 # data_path = os.path.join('c:/', 'Datat/SpathyData/SVECatchments')
 # spathy_path = os.path.join('c:/', 'Repositories/spathy')
 # os.chdir(spathy_path)
-
 
 def clear_console():
     """
@@ -29,22 +32,229 @@ def clear_console():
     clear()
     return None
 
-""" Functions for data input and output """
+""" ******* netcdf output file ****** """
+
+def initialize_netCDF(ID, fname, lat0, lon0, dlat, dlon, dtime=None):
+    """
+    SpatHy netCDF4 format output file initialization
+    IN:
+        ID -catchment id as str
+        fname - filename
+        lat0, lon0 - latitude and longitude
+        dlat - nr grid cells in lat
+        dlon - nr grid cells in lon
+        dtime - nr timesteps, dtime=None --> unlimited
+    OUT:
+        ncf - netCDF file handle. Initializes data
+        ff - netCDF filename incl. path
+    LAST EDIT 05.10.2018 / Samuli
+    """
+
+    from netCDF4 import Dataset #, date2num, num2date
+    from datetime import datetime
+
+    print('**** creating SpaFHy netCDF4 file: ' + fname + ' ****')
+    
+    # create dataset & dimensions
+    directory = os.path.dirname(fname)
+    print(directory)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    ncf = Dataset(fname, 'w')
+    ncf.description = 'SpatHy results. Catchment : ' + str(ID)
+    ncf.history = 'created ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ncf.source = 'SpaFHy v.1.0'
+
+    ncf.createDimension('dtime', dtime)
+    ncf.createDimension('dlon', dlon)
+    ncf.createDimension('dlat', dlat)
 
 
+    # call as createVariable(varname,type,(dimensions))
+    time = ncf.createVariable('time', 'f8', ('dtime',))
+    time.units = "days since 0001-01-01 00:00:00.0"
+    time.calendar = 'standard'
+
+    lat = ncf.createVariable('lat', 'f4', ('dlat',))
+    lat.units = 'ETRS-TM35FIN'
+    lon = ncf.createVariable('lon', 'f4', ('dlon',))
+    lon.units = 'ETRS-TM35FIN'
+
+    lon[:] = lon0
+    lat[:] = lat0
+    
+    # CanopyGrid outputs
+    W = ncf.createVariable('/cpy/W', 'f4', ('dtime', 'dlat', 'dlon',))
+    W.units = 'canopy storage [mm]'
+    SWE = ncf.createVariable('/cpy/SWE', 'f4', ('dtime', 'dlat', 'dlon',))
+    SWE.units = 'snow water equiv. [mm]'
+    Trfall = ncf.createVariable('/cpy/Trfall', 'f4', ('dtime', 'dlat', 'dlon',))
+    Trfall.units = 'throughfall [mm]'
+    Inter = ncf.createVariable('/cpy/Inter', 'f4', ('dtime', 'dlat', 'dlon',))
+    Inter.units = 'interception [mm]'
+    Potinf = ncf.createVariable('/cpy/Potinf', 'f4', ('dtime', 'dlat', 'dlon',))
+    Potinf.units = 'pot. infiltration [mm]'
+    ET = ncf.createVariable('/cpy/ET', 'f4', ('dtime', 'dlat', 'dlon',))
+    ET.units = 'dry-canopy et. [mm]'
+    Transpi = ncf.createVariable('/cpy/Transpi', 'f4', ('dtime', 'dlat', 'dlon',))
+    Transpi.units = 'transpiration [mm]'
+    Efloor = ncf.createVariable('/cpy/Efloor', 'f4', ('dtime', 'dlat', 'dlon',))
+    Efloor.units = 'forest floor evap. [mm]'
+    Evap = ncf.createVariable('/cpy/Evap', 'f4', ('dtime', 'dlat', 'dlon',))
+    Evap.units = 'interception evap. [mm]'
+    Mbe = ncf.createVariable('/cpy/Mbe', 'f4', ('dtime', 'dlat', 'dlon',))
+    Mbe.units = 'mass-balance error [mm]'
+
+    # BucketGrid outputs
+    Wliq = ncf.createVariable('/bu/Wliq', 'f4', ('dtime', 'dlat', 'dlon',))
+    Wliq.units = 'root zone vol. water cont. [m3m-3]'
+    Wliq_top = ncf.createVariable('/bu/Wliq_top', 'f4', ('dtime', 'dlat', 'dlon',))
+    Wliq_top.units = 'org. layer vol. water cont. [m3m-3]'
+    PondSto = ncf.createVariable('/bu/PondSto', 'f4', ('dtime', 'dlat', 'dlon',))
+    PondSto.units = 'pond storage [mm]'
+    Infil = ncf.createVariable('/bu/Infil', 'f4', ('dtime', 'dlat', 'dlon',))
+    Infil.units = 'infiltration [mm]'
+    Drain = ncf.createVariable('/bu/Drain', 'f4', ('dtime', 'dlat', 'dlon',))
+    Drain.units = 'drainage [mm]'
+    Mbe = ncf.createVariable('/bu/Mbe', 'f4', ('dtime', 'dlat', 'dlon',))
+    Mbe.units = 'mass-balance error [mm]'
+
+    # topmodel outputs
+    Qt = ncf.createVariable('/top/Qt', 'f4', ('dtime',))
+    Qt.units = 'streamflow[m]'
+    Qb = ncf.createVariable('/top/Qb', 'f4', ('dtime',))
+    Qb.units = 'baseflow [m]'
+    Qr = ncf.createVariable('/top/Qr', 'f4', ('dtime',))
+    Qr.units = 'returnflow [m]'
+    Qs = ncf.createVariable('/top/Qs', 'f4', ('dtime',))
+    Qs.units = 'surface runoff [m]'
+    R = ncf.createVariable('/top/R', 'f4', ('dtime',))
+    R.units = 'average recharge [m]'
+    S = ncf.createVariable('/top/S', 'f4', ('dtime',))
+    S.units = 'average sat. deficit [m]'
+    fsat = ncf.createVariable('/top/fsat', 'f4', ('dtime',))
+    fsat.units = 'saturated area fraction [-]'
+    #This addition is for the saturation map
+    Sloc = ncf.createVariable('/top/Sloc', 'f4', ('dtime','dlat','dlon',))
+    Sloc.units = 'local sat. deficit [m]'
+    
+    # gisdata
+    soilclass = ncf.createVariable('/gis/soilclass', 'f4', ('dlat', 'dlon',))
+    soilclass.units = 'soil type code [int]'
+    twi = ncf.createVariable('/gis/twi', 'f4', ('dlat', 'dlon',))
+    twi.units = 'twi'
+    LAI_conif = ncf.createVariable('/gis/LAI_conif', 'f4', ('dlat', 'dlon',))
+    LAI_conif.units = 'LAI_conif [m2m-2]'
+    LAI_decid = ncf.createVariable('/gis/LAI_decid', 'f4', ('dlat', 'dlon',))
+    LAI_decid.units = 'LAI_decid [m2m-2]'
+    stream = ncf.createVariable('/gis/stream', 'f4', ('dlat', 'dlon',))
+    stream.units = 'stream mask'
+    dem = ncf.createVariable('/gis/dem', 'f4', ('dlat', 'dlon',))
+    dem.units = 'dem'
+    slope = ncf.createVariable('/gis/slope', 'f4', ('dlat', 'dlon',))
+    slope.units = 'slope'
+    flowacc = ncf.createVariable('/gis/flowacc', 'f4', ('dlat', 'dlon',))
+    flowacc.units = 'flowacc'
+    cmask = ncf.createVariable('/gis/cmask', 'f4', ('dlat', 'dlon',))
+    cmask.units = 'cmask'
+    
+    print('**** netCDF4 file created ****')
+    return ncf, fname
+
+def combine_spafhy_nc(site, ncfiles, outfile):
+    """
+    Combines SpaFHy netCDF outputs from adjacent catchments to single
+    netCDF-file. Assumes same time-dimension and variables in all infiles
+    Args:
+        site - str sitename
+        ncfiles - list of ncfiles to be combined
+        outfile - output filename
+    Returns:
+        none
+    """    
+    print('*** combining nc files: ' + site)
+    
+    N = len(ncfiles)
+    
+    """ initialize combined ncfile """
+    # combine lat and lon
+    df = Dataset(ncfiles[0], 'r')
+    lat = np.append([], df['lat'])
+    lon = np.append([], df['lon'])
+    dtime = df.dimensions['dtime'].size
+    df.close()
+    
+    for k in range(1, len(ncfiles)):
+        df = Dataset(ncfiles[k], 'r')
+        lat = np.append(lat, df['lat'])
+        lon = np.append(lon, df['lon'])
+        df.close()
+    
+    lon = np.unique(lon.data)
+    lat = np.unique(lat.data)
+    lat = - np.sort(-lat)
+    
+    # create output nc
+    cf, nf = initialize_netCDF(site, outfile, lat, lon, len(lat), len(lon), dtime=dtime)
+    
+    groups = list(cf.groups)
+    
+    # now loop through ncfiles and variables in groups
+    m = 0
+    for k in range(len(ncfiles)):
+        df = Dataset(ncfiles[k], 'r')
+        ix_lat = np.where(np.logical_and(cf['lat'] <= np.max(df['lat']), 
+                                         cf['lat'] >= np.min(df['lat'])))[0] 
+    
+        ix_lon = np.where(np.logical_and(cf['lon'] <= np.max(df['lon']),
+                                         cf['lon'] >= np.min(df['lon'])))[0]
+        
+        # loop groups and variables
+        for g in groups:
+            for v in list(df[g].variables):
+                if len(np.shape(df[g][v])) == 3: # dtime, dlat, dlon spatial arrays
+                    # plt.figure(k)
+                    # plt.imshow(df['bu']['Wliq'][180,:,:])
+        
+                    a = np.array(cf[g][v][:,ix_lat, ix_lon])
+                    b = np.array(df[g][v][:,:,:])
+        
+                    ix = np.where(~np.isnan(b))
+                    a[ix] = b[ix]
+                    cf[g][v][:,ix_lat, ix_lon] = a
+                    del a, b, ix
+                elif len(np.shape(df[g][v])) == 2: # dlat, dlon spatial arrays
+                    # plt.figure(k)
+                    # plt.imshow(df['bu']['Wliq'][180,:,:])
+        
+                    a = np.array(cf[g][v][ix_lat, ix_lon])
+                    b = np.array(df[g][v][:,:])
+        
+                    ix = np.where(~np.isnan(b))
+                    a[ix] = b[ix]
+                    cf[g][v][ix_lat, ix_lon] = a
+                    del a, b, ix
+                else: # topmodel scalar outputs are computed as averages
+                    if m == 0:
+                        cf[g][v][:] = df[g][v][:] * 1. / N
+                    else:
+                        cf[g][v][:] += df[g][v][:] * 1. / N
+        m += 1
+        df.close()
+        print(m)
+    
+    return cf
 
 """
-***** SVE -valuma-alueet -- get gis data to create catchment ******
+***** Get gis data to create catchment ******
 """
-
-def create_catchment(ID, fpath, plotgrids=False, plotdistr=False):
+def create_catchment(fpath, plotgrids=False, plotdistr=False):
     """
     reads gis-data grids from selected catchments and returns numpy 2d-arrays
     IN:
-        ID - SVE catchment ID (int or str)
-        fpath - folder (str)
-        psoil - soil properties
-        plotgrids - True plots
+        fpath - filepathfolder (str)
+        plotgrids - True plots grids
+        plotdistr - True plots distributions
     OUT:
         GisData - dictionary with 2d numpy arrays and some vectors/scalars.
 
@@ -53,14 +263,8 @@ def create_catchment(ID, fpath, plotgrids=False, plotdistr=False):
         'info','lat0'[latitude, euref_fin],'lon0'[longitude, euref_fin],loc[outlet coords,euref_fin],'cellsize'[cellwidth,m],
         'peatm','stream','cmask','rockm'[masks, 1=True]      
         
-    TODO (6.2.2017 Samuli): 
-        mVMI-datan koodit >32766 ovat vesialueita ja ei-metsäalueita (tiet, sähkölinjat, puuttomat suot) käytä muita maskeja (maastotietokanta, kysy
-        Auralta tie + sähkölinjamaskit) ja IMPOSE LAI ja muut muuttujat ko. alueille. Nyt menevät no-data -luokkaan eikä oteta mukaan laskentaan.
     """
-    # fpath = os.path.join(fpath, str(ID) + '\\sve_' + str(ID) + '_')
-    fpath = os.path.join(fpath, str(ID))
-    bname = 'sve_' + str(ID) + '_'
-    print(fpath)            
+       
     # specific leaf area (m2/kg) for converting leaf mass to leaf area        
     # SLA = {'pine': 5.54, 'spruce': 5.65, 'decid': 18.46}  # m2/kg, Kellomäki et al. 2001 Atm. Env.
     SLA = {'pine': 6.8, 'spruce': 4.7, 'decid': 14.0}  # Härkönen et al. 2015 BER 20, 181-195
@@ -72,55 +276,59 @@ def create_catchment(ID, fpath, plotgrids=False, plotdistr=False):
               'LAIpine': 0.01, 'LAIspruce': 0.01, 'LAIdecid': 0.1, 'bmroot': 0.01}
 
     # dem, set values outside boundaries to NaN
-    dem, info, pos, cellsize, nodata = read_AsciiGrid(os.path.join(fpath, bname + 'dem_16m_aggr.asc'))
+    dem, info, pos, cellsize, nodata = read_AsciiGrid(os.path.join(fpath, 'dem.asc'))
     # latitude, longitude arrays    
     nrows, ncols = np.shape(dem)
     lon0 = np.arange(pos[0], pos[0] + cellsize*ncols, cellsize)
     lat0 = np.arange(pos[1], pos[1] + cellsize*nrows, cellsize)
     lat0 = np.flipud(lat0)  # why this is needed to get coordinates correct when plotting?
-
     # catchment mask cmask ==1, np.NaN outside
     cmask = dem.copy()
     cmask[np.isfinite(cmask)] = 1.0
-
     # flowacc, D-infinity, nr of draining cells
-    flowacc, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'Flow_accum_D-Inf_grids.asc'))
+    flowacc, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'flow_acc.asc'))
     flowacc = flowacc*cellsize**2  # in m2
     # slope, degrees
-    slope, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'slope_16m.asc'))
+    slope, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'slope.asc'))
     # twi
-    twi, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'TWI_16m.asc'))
-    
+    twi, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'twi.asc'))
     """
     Create soiltype grid and masks for waterbodies, streams, peatlands and rocks
     """
     # Maastotietokanta water bodies: 1=waterbody
-    stream, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'vesielementit_mtk.asc'))
+    stream, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'vesielementit_prel.asc'))
     stream[np.isfinite(stream)] = 1.0
-    # maastotietokanta peatlandmask
-    peatm, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'suo_mtk.asc'))
-    peatm[np.isfinite(peatm)] = 1.0
-    # maastotietokanta kalliomaski
-    rockm, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'kallioalue_mtk.asc'))
-    rockm[np.isfinite(rockm)] = 1.0
     
+    # maastotietokanta peatlandmask
+    peatm, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'suo.asc'))
+    peatm[np.isfinite(peatm)] = 1.0
+    #print(np.shape(peatm))
+    
+    # maastotietokanta kalliomaski
+    rockm, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'kallio.asc'))
+    rockm[np.isfinite(rockm)] = 1.0
     """
     gtk soilmap: read and re-classify into 4 texture classes
     #GTK-pintamaalaji grouped to 4 classes (Samuli Launiainen, Jan 7, 2017)
     #Codes based on maalaji 1:20 000 AND ADD HERE ALSO 1:200 000
     """
-    CoarseTextured = [195213, 195314, 19531421, 195313, 195310]
-    MediumTextured = [195315, 19531521, 195215, 195214, 195601, 195411, 195112,
-                      195311, 195113, 195111, 195210, 195110, 195312]
+    #CoarseTextured = [195213, 195314, 19531421, 195313, 195310]
+    #MediumTextured = [195315, 19531521, 195215, 195214, 195601, 195411, 195112,
+    #                  195311, 195113, 195111, 195210, 195110, 195312]
     FineTextured = [19531521, 195412, 19541221, 195511, 195413, 195410,
                     19541321, 195618]
     Peats = [195512, 195513, 195514, 19551822, 19551891, 19551892]
+    CoarseTextured = [195213, 195314, 19531421, 195313, 195310, 195111, 195311, 
+                      195312, 195113, 195112, 195110] 
+    #195111 kalliomaa 195311 lohkareita 195312 kiviä 195113 rapakallio 195112 rakka 195110 kalliopaljastuma
+    MediumTextured = [195315, 19531521, 195215, 195214, 195601, 195411, 195210] # tasta siirretty joitakin maalajikoodeja luokkaan CoarseTextured, jatkossa voisi luoda oman kallioluokan...
     Water = [195603]
 
-    gtk_s, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'soil.asc')) 
-    
+    gtk_s, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'soil_merged_pintamaa_cl.asc')) 
+
     r, c = np.shape(gtk_s)
     soil = np.ravel(gtk_s)
+
     #del gtk_s
 
     soil[np.in1d(soil, CoarseTextured)] = 1.0  # ; soil[f]=1; del f
@@ -132,108 +340,138 @@ def create_catchment(ID, fpath, plotgrids=False, plotdistr=False):
     # reshape back to original grid
     soil = soil.reshape(r, c)
     del r, c
-    soil[np.isfinite(peatm)] = 4.0
+    
     # update waterbody mask
     ix = np.where(soil == -1.0)
     stream[ix] = 1.0
     
-    # update catchment mask so that water bodies are left out (SL 20.2.18)
-    #cmask[soil == -1.0] = np.NaN
+    #Warn, remove this
     cmask[soil <= 0] = np.NaN
+
     soil = soil * cmask
-    
+  
     """ stand data (MNFI)"""
     # stand volume [m3ha-1]
-    vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'tilavuus.asc'), setnans=False)
+    vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'tilavuus.asc'), setnans=False)
     vol = vol*cmask
+    
     # indexes for cells not recognized in mNFI
     ix_n = np.where((vol >= 32727) | (vol == -9999) )  # no satellite cover or not forest land: assign arbitrary values 
-    ix_p = np.where((vol >= 32727) & (peatm == 1))  # open peatlands: assign arbitrary values
+    ix_p = np.where((vol >= 32727) & (soil == 4.0))  # open peatlands: assign arbitrary values
     ix_w = np.where((vol >= 32727) & (stream == 1))  # waterbodies: leave out
+        
+    cmask_cc=cmask.copy() # uusi cmask get_clear_cutsien kasittelyyn
+    #cmask_cc[ix_ww] = np.NaN  
     cmask[ix_w] = np.NaN  # NOTE: leaves waterbodies out of catchment mask
+    
     vol[ix_n] = nofor['vol']
     vol[ix_p] = opeatl['vol']
     vol[ix_w] = np.NaN
 
+    #pine volume [m3 ha-1]
+    p_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'manty.asc'))
+    p_vol = p_vol*cmask
+    #spruce volume [m3 ha-1]
+    s_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'kuusi.asc'))
+    s_vol = s_vol*cmask
+    #birch volume [m3 ha-1]
+    b_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'koivu.asc'))
+    b_vol = b_vol*cmask
+    
+
     # basal area [m2 ha-1]
-    ba, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'ppa.asc') )
+    ba, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'ppa.asc') )
     ba[ix_n] = nofor['ba']
     ba[ix_p] = opeatl['ba']
     ba[ix_w] = np.NaN
 
     # tree height [m]
-    height, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'keskipituus.asc'))
+    height, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'keskipituus.asc'))
     height = 0.1*height  # m
     height[ix_n] = nofor['height']
     height[ix_p] = opeatl['height']
     height[ix_w] = np.NaN
 
     # canopy closure [-]    
-    cf, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'latvuspeitto.asc'))
-    cf = 1e-2*cf
+    #cf, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'latvuspeitto.asc'))
+    #cf = 1e-2*cf
+    cf = 0.1939 * ba / (0.1939 * ba + 1.69) + 0.01 # lisatty
+
     cf[ix_n] = nofor['cf']
     cf[ix_p] = opeatl['cf']
     cf[ix_w] = np.NaN
-    # cfd, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'lehtip_latvuspeitto.asc'))
-    # cfd = 1e-2*cfd  # percent to fraction
+
 
     # stand age [yrs]
-    age, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname+'ika.asc'))
+    age, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'ika.asc'))
     age[ix_n] = nofor['age']
     age[ix_p] = opeatl['age']
     age[ix_w] = np.NaN
 
     # leaf biomasses and one-sided LAI
-    bmleaf_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'bm_manty_neulaset.asc'))
-    bmleaf_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'bm_kuusi_neulaset.asc'))
-    bmleaf_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'bm_lehtip_neulaset.asc'))
-    # bmleaf_pine[ix_n]=np.NaN; bmleaf_spruce[ix_n]=np.NaN; bmleaf_decid[ix_n]=np.NaN;
+    bmleaf_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_manty_neulaset.asc'))
+    bmleaf_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_kuusi_neulaset.asc'))
+    bmleaf_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_lehtip_neulaset.asc'))
+    bmleaf_pine[np.where(bmleaf_pine >= 32767)]=np.NaN
+    bmleaf_spruce[np.where(bmleaf_spruce >= 32767)]=np.NaN
+    bmleaf_decid[np.where(bmleaf_decid >= 32767)]=np.NaN
 
-    LAI_pine = 1e-3*bmleaf_pine*SLA['pine']  # 1e-3 converts 10kg/ha to kg/m2
+    LAI_pine = 1e-3 * bmleaf_pine * SLA['pine']  # 1e-3 converts 10kg/ha to kg/m2
     LAI_pine[ix_n] = nofor['LAIpine']
     LAI_pine[ix_p] = opeatl['LAIpine']
     LAI_pine[ix_w] = np.NaN
 
-    LAI_spruce = 1e-3*bmleaf_spruce*SLA['spruce']
+    LAI_spruce = 1e-3*bmleaf_spruce * SLA['spruce']
     LAI_spruce[ix_n] = nofor['LAIspruce']
     LAI_spruce[ix_p] = opeatl['LAIspruce']
     LAI_spruce[ix_w] = np.NaN
 
-    LAI_decid = 1e-3*bmleaf_decid*SLA['decid']
+    LAI_decid = 1e-3*bmleaf_decid * SLA['decid']
     LAI_decid[ix_n] = nofor['LAIdecid']
     LAI_decid[ix_p] = opeatl['LAIdecid']
     LAI_decid[ix_w] = np.NaN
 
-    bmroot_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'bm_manty_juuret.asc'))
-    bmroot_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'bm_kuusi_juuret.asc'))
-    bmroot_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'bm_lehtip_juuret.asc'))  
+    bmroot_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_manty_juuret.asc'))
+    bmroot_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_kuusi_juuret.asc'))
+    bmroot_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_lehtip_juuret.asc'))  
     bmroot = 1e-2*(bmroot_pine + bmroot_spruce + bmroot_decid)  # 1000 kg/ha
     bmroot[ix_n] = nofor['bmroot']
     bmroot[ix_p] = opeatl['bmroot']
     bmroot[ix_w] = np.NaN
-
+    
     # site types
-    maintype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'paatyyppi.asc'))
+    maintype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'paatyyppi.asc'))
     maintype = maintype*cmask
-    sitetype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, bname + 'kasvupaikka.asc'))
+    sitetype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'kasvupaikka.asc'))
     sitetype = sitetype*cmask
+    
+        
     
     # catchment outlet location and catchment mean elevation
     (iy, ix) = np.where(flowacc == np.nanmax(flowacc))
     loc = {'lat': lat0[iy], 'lon': lon0[ix], 'elev': np.nanmean(dem)}
-
     # dict of all rasters
-    GisData = {'cmask': cmask, 'dem': dem, 'flowacc': flowacc, 'slope': slope,
-               'twi': twi, 'gtk_soilcode': gtk_s, 'soilclass': soil, 'peatm': peatm, 'stream': stream,
-               'rockm': rockm, 'LAI_pine': LAI_pine, 'LAI_spruce': LAI_spruce,
-               'LAI_conif': LAI_pine + LAI_spruce,
+    GisData = {'cmask': cmask, 'cmask_cc': cmask_cc, 'dem': dem, 'flowacc': flowacc, 
+               'slope': slope, 'twi': twi, 'gtk_soilcode': gtk_s, 'soilclass': soil, 
+               #'smc':smc, 'sfc': sfc, 'soil':soil,
+               'peatm': peatm, 'stream': stream, 'rockm': rockm, 'LAI_pine': LAI_pine, 
+               'LAI_spruce': LAI_spruce, 'LAI_conif': LAI_pine + LAI_spruce, 
                'LAI_decid': LAI_decid, 'bmroot': bmroot, 'ba': ba, 'hc': height,
-               'vol': vol, 'cf': cf, 'age': age, 'maintype': maintype, 'sitetype': sitetype,
-               'cellsize': cellsize, 'info': info, 'lat0': lat0, 'lon0': lon0, 'loc': loc}   
+               'vol': vol, 'p_vol':p_vol,'s_vol':s_vol,'b_vol':b_vol,'cf': cf, 
+               'age': age, 'maintype': maintype, 'sitetype': sitetype,
+               'cellsize': cellsize, 'info': info, 'lat0': lat0, 'lon0': lon0, 'loc': loc,
+              }   
 
     if plotgrids is True:
         # %matplotlib qt
         # xx, yy = np.meshgrid(lon0, lat0)
+        
+        # mask for plotting
+        mask = cmask.copy()*0.0
+        
+        ccmask = cmask.copy()
+        ccmask[ix_n] = 0.0
+        
         plt.close('all')
 
         plt.figure()
@@ -246,71 +484,72 @@ def create_catchment(ID, fpath, plotgrids=False, plotdistr=False):
         plt.subplot(223)
         plt.imshow(slope); plt.colorbar(); plt.title('slope(deg)')
         plt.subplot(224)
-        plt.imshow(flowacc); plt.colorbar(); plt.title('flowacc (m2)')
+        plt.imshow(np.log(flowacc)); plt.colorbar(); plt.title('log flowacc (m2)')
 
         plt.figure(figsize=(6, 14))
 
         plt.subplot(221)
         plt.imshow(soil); plt.colorbar(); plt.title('soiltype')
         mask = cmask.copy()*0.0
-        mask[np.isfinite(peatm)] = 1
-        mask[np.isfinite(rockm)] = 2
+        mask[soil==4] = 1
+        #mask[np.isfinite(rockm)] = 2
         mask[np.isfinite(stream)] = 3
 
         plt.subplot(222)
         plt.imshow(mask); plt.colorbar(); plt.title('masks')
         plt.subplot(223)
-        plt.imshow(LAI_pine+LAI_spruce + LAI_decid); plt.colorbar(); plt.title('LAI (m2/m2)')
+        LAIt = (LAI_pine+ LAI_spruce + LAI_decid) * ccmask
+        plt.imshow(LAIt); plt.colorbar(); plt.title('LAI (m2/m2)')
         plt.subplot(224)
-        plt.imshow(cf); plt.colorbar(); plt.title('cf (-)')
+        plt.imshow(cf * ccmask); plt.colorbar(); plt.title('cf (-)')
 
         
-        plt.figure(figsize=(6,11))
+        plt.figure()
         plt.subplot(321)
-        plt.imshow(vol); plt.colorbar(); plt.title('vol (m3/ha)')
+        plt.imshow(vol * ccmask); plt.colorbar(); plt.title('vol (m3/ha)')
         plt.subplot(323)
-        plt.imshow(height); plt.colorbar(); plt.title('hc (m)')
+        plt.imshow(height * ccmask); plt.colorbar(); plt.title('hc (m)')
         #plt.subplot(223)
         #plt.imshow(ba); plt.colorbar(); plt.title('ba (m2/ha)')
         plt.subplot(325)
-        plt.imshow(age); plt.colorbar(); plt.title('age (yr)')
+        plt.imshow(age * ccmask); plt.colorbar(); plt.title('age (yr)')
         plt.subplot(322)
-        plt.imshow(1e-3*bmleaf_pine); plt.colorbar(); plt.title('pine needles (kg/m2)')
+        plt.imshow(1e-3*bmleaf_pine * ccmask); plt.colorbar(); plt.title('pine needles (kg/m2)')
         plt.subplot(324)
-        plt.imshow(1e-3*bmleaf_spruce); plt.colorbar(); plt.title('spruce needles (kg/m2)')
+        plt.imshow(1e-3*bmleaf_spruce * ccmask); plt.colorbar(); plt.title('spruce needles (kg/m2)')
         plt.subplot(326)
-        plt.imshow(1e-3*bmleaf_decid); plt.colorbar(); plt.title('decid. leaves (kg/m2)')
+        plt.imshow(1e-3*bmleaf_decid * ccmask); plt.colorbar(); plt.title('decid. leaves (kg/m2)')
 
     if plotdistr is True:
         twi0 = twi[np.isfinite(twi)]
-        vol = vol[np.isfinite(vol)]
-        lai = LAI_pine + LAI_spruce + LAI_decid
-        lai = lai[np.isfinite(lai)]
+        vol = vol[np.isfinite(vol)]    
+        lai = LAIt[np.isfinite(LAIt)]
         soil0 = soil[np.isfinite(soil)]
         
-        plt.figure(100)
+        plt.figure()
         plt.subplot(221)
-        plt.hist(twi0, bins=100, color='b', alpha=0.5, normed=True)
+        plt.hist(twi0, bins=100, color='b', alpha=0.5, density=True, stacked=True)
         plt.ylabel('f');plt.ylabel('twi')
 
         s = np.unique(soil0)
         colcode = 'rgcym'
         for k in range(0,len(s)):
-            print(k)
+            # print k
             a = twi[np.where(soil==s[k])]
             a = a[np.isfinite(a)]
-            plt.hist(a, bins=50, alpha=0.5, color=colcode[k], normed=True, label='soil ' +str(s[k]))
+            plt.hist(a, bins=50, alpha=0.5, color=colcode[k], density=True, stacked=True, label='soil ' +str(s[k]))
         plt.legend()
         plt.show()
 
         plt.subplot(222)
-        plt.hist(vol, bins=100, color='k', normed=True); plt.ylabel('f'); plt.ylabel('vol')
+        plt.hist(vol, bins=100, color='k', density=True, stacked=True); plt.ylabel('f'); plt.ylabel('vol')
         plt.subplot(223)
-        plt.hist(lai, bins=100, color='g', normed=True); plt.ylabel('f'); plt.ylabel('lai')
+        plt.hist(lai, bins=100, color='g', density=True, stacked=True); plt.ylabel('f'); plt.ylabel('lai')
         plt.subplot(224)
-        plt.hist(soil0, bins=5, color='r', normed=True); plt.ylabel('f');plt.ylabel('soiltype')
+        plt.hist(soil0, bins=5, color='r', density=True, stacked=True); plt.ylabel('f');plt.ylabel('soiltype')
 
     return GisData
+
 
 def preprocess_soildata(pbu, psoil, soiltype, cmask, spatial=True):
     """
@@ -367,7 +606,6 @@ def read_AsciiGrid(fname, setnans=True):
     Samuli Launiainen Luke 7.9.2016
     """
     import numpy as np
-    print(fname)
     fid = open(fname, 'r')
     info = fid.readlines()[0:6]
     fid.close()
@@ -401,8 +639,10 @@ def write_AsciiGrid(fname, data, info, fmt='%.18e'):
     import numpy as np
 
     # replace nans with nodatavalue according to info
-    nodata = int(info[-1].split(' ')[-1])
-    data[np.isnan(data)] = nodata
+    #nodata = int(info[-1].split(' ')[-1])
+    nodata = float(info[5].split(' ')[-1])
+
+    #data[np.isnan(data)] = nodata
     # write info
     fid = open(fname, 'w')
     fid.writelines(info)
@@ -520,438 +760,6 @@ def inputs_netCDF(ID, fname, data):
     print('**** done  ****')
 
 
-# specific for MEOLO-sites
-""" ****************** creates gisdata dictionary from Vihti-koealue ************************ """
-
-def create_vihti_catchment(ID='Vihti', fpath='c:\\projects\\fotetraf\\spathy\\data', plotgrids=False, plotdistr=False):
-    """ 
-    reads gis-data grids from selected catchments and returns numpy 2d-arrays
-    IN: 
-        ID - SVE catchment ID (int or str)
-        fpath - folder (str)
-        plotgrids - True plots
-    OUT:
-        GisData - dictionary with 2d numpy arrays and some vectors/scalars.
-
-        keys [units]:'dem'[m],'slope'[deg],'soil'[coding 1-4], 'cf'[-],'flowacc'[m2], 'twi'[log m??],
-        'vol'[m3/ha],'ba'[m2/ha], 'age'[yrs], 'hc'[m], 'bmroot'[1000kg/ha],'LAI_pine'[m2/m2 one-sided],'LAI_spruce','LAI_decid',
-        'info','lat0'[latitude, euref_fin],'lon0'[longitude, euref_fin],loc[outlet coords,euref_fin],'cellsize'[cellwidth,m],
-        'peatm','stream','cmask','rockm'[masks, 1=True]      
-        
-    TODO (6.2.2017 Samuli): 
-        mVMI-datan koodit >32766 ovat vesialueita ja ei-metsäalueita (tiet, sähkölinjat, puuttomat suot) käytä muita maskeja (maastotietokanta, kysy
-        Auralta tie + sähkölinjamaskit) ja IMPOSE LAI ja muut muuttujat ko. alueille. Nyt menevät no-data -luokkaan eikä oteta mukaan laskentaan.
-    """
-    #from iotools import read_AsciiGrid
-
-    fpath=os.path.join(fpath,str(ID)+'_')
-                
-    #specific leaf area (m2/kg) for converting leaf mass to leaf area        
-    # SLA={'pine':5.54, 'spruce': 5.65, 'decid': 18.46} #m2/kg, Kellomäki et al. 2001 Atm. Env.
-    SLA = {'pine': 6.8, 'spruce': 4.7, 'decid': 14.0}  # Härkönen et al. 2015 BER 20, 181-195
-
-    #values to be set for 'open peatlands' and 'not forest land'
-    nofor={'vol':0.1, 'ba':0.01, 'height':0.1, 'cf': 0.01, 'age': 0.0, 'LAIpine': 0.01, 'LAIspruce':0.01, 'LAIdecid': 0.01, 'bmroot':0.01}
-    opeatl={'vol':0.01, 'ba':0.01, 'height':0.1, 'cf': 0.1, 'age': 0.0, 'LAIpine': 0.01, 'LAIspruce':0.01, 'LAIdecid': 0.01, 'bmroot':0.01}
-    
-    #dem, set values outside boundaries to NaN 
-    dem, info, pos, cellsize, nodata = read_AsciiGrid(fpath+'dem_16m.asc')
-    #latitude, longitude arrays    
-    nrows, ncols=np.shape(dem)    
-    lon0=np.arange(pos[0], pos[0]+cellsize*ncols,cellsize)
-    lat0=np.arange(pos[1], pos[1]+cellsize*nrows,cellsize)
-    lat0=np.flipud(lat0) #why this is needed to get coordinates correct when plotting?
-
-    #catchment mask cmask ==1, np.NaN outside
-    cmask=dem.copy(); cmask[np.isfinite(cmask)]=1.0
-    
-    #flowacc, D-infinity, nr of draining cells
-    flowacc, _, _, _, _ = read_AsciiGrid(fpath +'flowaccum_16m.asc')
-    conv = np.nanmin(flowacc)  # to correct units in file
-    flowacc = flowacc / conv *cellsize**2 #in m2
-    #slope, degrees
-    slope, _, _, _, _ = read_AsciiGrid(fpath + 'slope_16m.asc')
-    #twi
-    twi, _, _, _, _ = read_AsciiGrid(fpath + 'twi_16m.asc')
-    
-    #Maastotietokanta water bodies: 1=waterbody
-    stream, _, _, _, _ = read_AsciiGrid(fpath +'vesielementit_1_0.asc')
-    stream[stream == 0.0] = np.NaN
-    stream[np.isfinite(stream)]=1.0    
-    #maastotietokanta peatlandmask
-    #peatm, _, _, _, _ = read_AsciiGrid(fpath + 'suo_mtk.asc')
-    peatm = np.ones([nrows, ncols])*np.NaN
-    #peatm[np.isfinite(peatm)]=1.0   
-    #maastotietokanta kalliomaski
-    #rockm, _, _, _, _ = read_AsciiGrid(fpath +'kallioalue_mtk.asc')
-    #rockm[np.isfinite(rockm)]=1.0        
-    rockm = peatm.copy()
-            
-    """ stand data (MNFI)"""
-
-    #stand volume [m3ha-1]
-    vol, _, _, _, _ = read_AsciiGrid(fpath +'tilavuus.asc', setnans=False)
-    vol=vol*cmask
-    #indexes for cells not recognized in mNFI
-    ix_n=np.where((vol>=32727) | (vol==-9999) ) #no satellite cover or not forest land: assign arbitrary values 
-    ix_p=np.where((vol>=32727) & (peatm==1))#open peatlands: assign arbitrary values
-    ix_w=np.where((vol>=32727) & (stream==1)) #waterbodies: leave out
-    cmask[ix_w]=np.NaN #*********** NOTE: leave waterbodies out of catchment mask !!!!!!!!!!!!!!!!!!!!!!
-    vol[ix_n]=nofor['vol']; vol[ix_p]=opeatl['vol']; vol[ix_w]=np.NaN
-    #basal area [m2 ha-1]
-    ba, _, _, _, _ = read_AsciiGrid(fpath +'ppa.asc') 
-    ba[ix_n]=nofor['ba']; ba[ix_p]=opeatl['ba']; ba[ix_w]=np.NaN
-    
-   #tree height [m]
-    height, _, _, _, _ = read_AsciiGrid(fpath +'keskipituus.asc')
-    height=0.1*height #m  
-    height[ix_n]=nofor['height']; height[ix_p]=opeatl['height']; height[ix_w]=np.NaN
-    
-    #canopy closure [-]    
-    cf, _, _, _, _ = read_AsciiGrid(fpath +'latvuspeitto.asc')   
-    cfd, _, _, _, _ = read_AsciiGrid(fpath +'lehtip_latvuspeitto.asc')
-    cf=1e-2*cf; cfd=1e-2*cfd; #in fraction
-    cf[ix_n]=nofor['cf']; cf[ix_p]=opeatl['cf']; cf[ix_w]=np.NaN
-    
-    #stand age [yrs]
-    age, _, _, _, _ = read_AsciiGrid(fpath +'ika.asc')
-    age[ix_n]=nofor['age']; age[ix_p]=opeatl['age']; age[ix_w]=np.NaN
-    
-    #leaf biomasses and one-sided LAI
-    bmleaf_pine, _, _, _, _ = read_AsciiGrid(fpath +'bm_manty_neulaset.asc')
-    bmleaf_spruce, _, _, _, _ = read_AsciiGrid(fpath +'bm_kuusi_neulaset.asc')
-    bmleaf_decid, _, _, _, _ = read_AsciiGrid(fpath +'bm_lehtip_neulaset.asc')
-   # bmleaf_pine[ix_n]=np.NaN; bmleaf_spruce[ix_n]=np.NaN; bmleaf_decid[ix_n]=np.NaN;
-    
-    LAI_pine=1e-3*bmleaf_pine*SLA['pine'] #1e-3 converts 10kg/ha to kg/m2
-    LAI_pine[ix_n]=nofor['LAIpine']; LAI_pine[ix_p]=opeatl['LAIpine']; age[ix_w]=np.NaN
-    
-    LAI_spruce=1e-3*bmleaf_spruce*SLA['spruce'] #1e-3 converts 10kg/ha to kg/m2
-    LAI_spruce[ix_n]=nofor['LAIspruce']; LAI_spruce[ix_p]=opeatl['LAIspruce']; age[ix_w]=np.NaN
-    
-    LAI_conif = LAI_spruce + LAI_pine
-    
-    LAI_decid=1e-3*bmleaf_decid*SLA['decid'] #1e-3 converts 10kg/ha to kg/m2
-    LAI_decid[ix_n]=nofor['LAIdecid']; LAI_decid[ix_p]=opeatl['LAIdecid']; age[ix_w]=np.NaN        
-    
-    bmroot_pine, _, _, _, _ = read_AsciiGrid(fpath +'bm_manty_juuret.asc')
-    bmroot_spruce, _, _, _, _ = read_AsciiGrid(fpath +'bm_kuusi_juuret.asc')
-    bmroot_decid, _, _, _, _ = read_AsciiGrid(fpath +'bm_lehtip_juuret.asc')         
-    bmroot=1e-2*(bmroot_pine + bmroot_spruce + bmroot_decid) #1000 kg/ha 
-    bmroot[ix_n]=nofor['bmroot']; bmroot[ix_p]=opeatl['bmroot']; age[ix_w]=np.NaN    
-    
-    """
-    gtk soilmap: read and re-classify into 4 texture classes
-    #GTK-pintamaalaji grouped to 4 classes (Samuli Launiainen, Jan 7, 2017)
-    #Codes based on maalaji 1:20 000 AND ADD HERE ALSO 1:200 000
-    """
-    CoarseTextured = [195213,195314,19531421,195313,195310]
-    MediumTextured = [195315,19531521,195215,195214,195601,195411,195112,195311,195113,195111,195210,195110,195312]
-    FineTextured = [19531521, 195412,19541221,195511,195413,195410,19541321,195618]
-    Peats = [195512,195513,195514,19551822,19551891,19551892]
-    Water =[195603]
-
-    gtk_s, _, _, _, _ = read_AsciiGrid(fpath +'soil.asc') 
-
-    r,c=np.shape(gtk_s);
-    soil=np.ravel(gtk_s); del gtk_s
-    soil[np.in1d(soil, CoarseTextured)]=1.0 #; soil[f]=1; del f
-    soil[np.in1d(soil, MediumTextured)]=2.0
-    soil[np.in1d(soil, FineTextured)]=3.0
-    soil[np.in1d(soil, Peats)]=4.0
-    soil[np.in1d(soil, Water)]=-1.0
-        
-    #soil[soil>4.0]=-1.0;
-    #reshape back to original grid
-    soil=soil.reshape(r,c)*cmask; del r,c
-    soil[np.isfinite(peatm)]=4.0
-    #update waterbody mask    
-    ix=np.where(soil==-1.0)
-    stream[ix]=1.0     
-
-    # update catchment mask so that water bodies are left out (SL 20.2.18)
-    #cmask[soil == -1.0] = np.NaN
-    cmask[soil <= 0] = np.NaN
-    soil = soil * cmask
-    
-    #catchment outlet location
-    (iy,ix)=np.where(flowacc==np.nanmax(flowacc));
-    loc={'lat':lat0[iy],'lon':lon0[ix],'elev': np.nanmean(dem)}
-    
-    # harvester driving route and location of test sites
-
-    route, _, _, _, _ = read_AsciiGrid(fpath +'route.asc')
-    test_sites, _, _, _, _ = read_AsciiGrid(fpath +'test_sites.asc')
-          
-    GisData={'cmask':cmask, 'dem':dem, 'flowacc': flowacc, 'slope': slope, 'twi': twi, 'soilclass':soil,
-             'peatm':peatm, 'stream': stream, 'rockm': rockm,'LAI_pine': LAI_pine,
-             'LAI_spruce': LAI_spruce, 'LAI_conif': LAI_conif, 'LAI_decid': LAI_decid,
-             'bmroot': bmroot, 'ba': ba, 'hc': height, 'vol':vol,'cf':cf, 'cfd': cfd,
-             'age': age, 'route': route, 'test_sites': test_sites, 
-             'cellsize': cellsize, 'info': info, 'lat0':lat0, 'lon0':lon0,'loc':loc}   
-
-    if plotgrids is True:
-        #%matplotlib qt
-        #xx,yy=np.meshgrid(lon0, lat0)
-        plt.close('all')
-        
-        plt.figure()        
-        plt.subplot(221);plt.imshow(dem); plt.colorbar(); plt.title('DEM (m)');plt.plot(ix,iy,'rs')
-        plt.subplot(222);plt.imshow(twi); plt.colorbar(); plt.title('TWI')
-        plt.subplot(223);plt.imshow(slope); plt.colorbar(); plt.title('slope(deg)')
-        plt.subplot(224);plt.imshow(flowacc); plt.colorbar(); plt.title('flowacc (m2)')
-        #
-        plt.figure()
-        plt.subplot(221); plt.imshow(soil); plt.colorbar(); plt.title('soiltype')
-        mask=cmask.copy()*0.0
-        mask[np.isfinite(peatm)]=1; mask[np.isfinite(rockm)]=2; mask[np.isfinite(stream)]=3; 
-        plt.subplot(222); plt.imshow(mask); plt.colorbar(); plt.title('masks')
-        plt.subplot(223); plt.imshow(LAI_pine+LAI_spruce + LAI_decid); plt.colorbar(); plt.title('LAI (m2/m2)')
-        plt.subplot(224); plt.imshow(cf); plt.colorbar(); plt.title('cf (-)')
-        
-        plt.figure()
-        plt.subplot(221);plt.imshow(vol); plt.colorbar(); plt.title('vol (m3/ha)')
-        plt.subplot(222);plt.imshow(height); plt.colorbar(); plt.title('hc (m)')
-        plt.subplot(223);plt.imshow(ba); plt.colorbar(); plt.title('ba (m2/ha)')
-        plt.subplot(224);plt.imshow(age); plt.colorbar(); plt.title('age (yr)')
-    
-    if plotdistr is True:
-        plt.figure()        
-        #twi
-        twi0=twi[np.isfinite(twi)]; vol=vol[np.isfinite(vol)]; lai=LAI_pine + LAI_spruce + LAI_decid
-        lai=lai[np.isfinite(lai)];soil0=soil[np.isfinite(soil)]
-        
-        plt.subplot(221); plt.hist(twi0,bins=100,color='b',alpha=0.5,normed=True); plt.ylabel('f');plt.ylabel('twi')
-       
-        s=np.unique(soil0); print(s)
-        colcode='rgcym'
-        for k in range(0,len(s)):
-            print(k)
-            a=twi[np.where(soil==s[k])]; a=a[np.isfinite(a)]
-            plt.hist(a,bins=50,alpha=0.5,color=colcode[k], normed=True, label='soil ' +str(s[k]))
-        plt.legend(); plt.show()
-       
-        plt.subplot(222); plt.hist(vol,bins=100,color='k',normed=True); plt.ylabel('f');plt.ylabel('vol')
-        plt.subplot(223); plt.hist(lai,bins=100,color='g',normed=True); plt.ylabel('f');plt.ylabel('lai')
-        plt.subplot(224); plt.hist(soil0, bins=5,color='r',normed=True); plt.ylabel('f');plt.ylabel('soiltype')
-
-        
-    return GisData
-    
-def create_kuru_catchment(ID='Kuru', fpath=None, plotgrids=False, plotdistr=False):
-    """ 
-    reads gis-data grids from selected catchments and returns numpy 2d-arrays
-    IN: 
-        ID - SVE catchment ID (int or str)
-        fpath - filepath (str)
-        plotgrids - True plots
-    OUT:
-        GisData - dictionary with 2d numpy arrays and some vectors/scalars.
-
-        keys [units]:'dem'[m],'slope'[deg],'soil'[coding 1-4], 'cf'[-],'flowacc'[m2], 'twi'[log m??],
-        'vol'[m3/ha],'ba'[m2/ha], 'age'[yrs], 'hc'[m], 'bmroot'[1000kg/ha],'LAI_pine'[m2/m2 one-sided],'LAI_spruce','LAI_decid',
-        'info','lat0'[latitude, euref_fin],'lon0'[longitude, euref_fin],loc[outlet coords,euref_fin],'cellsize'[cellwidth,m],
-        'peatm','stream','cmask','rockm'[masks, 1=True]      
-        
-    TODO (6.2.2017 Samuli): 
-        mVMI-datan koodit >32766 ovat vesialueita ja ei-metsäalueita (tiet, sähkölinjat, puuttomat suot) käytä muita maskeja (maastotietokanta, kysy
-        Auralta tie + sähkölinjamaskit) ja IMPOSE LAI ja muut muuttujat ko. alueille. Nyt menevät no-data -luokkaan eikä oteta mukaan laskentaan.
-    """
-    #from iotools import read_AsciiGrid
-
-    fpath=os.path.join(fpath,str(ID)+'_')
-    #print fpath            
-    #specific leaf area (m2/kg) for converting leaf mass to leaf area        
-    # SLA={'pine':5.54, 'spruce': 5.65, 'decid': 18.46} #m2/kg, Kellomäki et al. 2001 Atm. Env.
-    SLA = {'pine': 6.8, 'spruce': 4.7, 'decid': 14.0}  # Härkönen et al. 2015 BER 20, 181-195
-
-    #values to be set for 'open peatlands' and 'not forest land'
-    nofor={'vol':0.1, 'ba':0.01, 'height':0.1, 'cf': 0.01, 'age': 0.0, 'LAIpine': 0.01, 'LAIspruce':0.01, 'LAIdecid': 0.01, 'bmroot':0.01}
-    opeatl={'vol':0.01, 'ba':0.01, 'height':0.1, 'cf': 0.1, 'age': 0.0, 'LAIpine': 0.01, 'LAIspruce':0.01, 'LAIdecid': 0.01, 'bmroot':0.01}
-    
-    #dem, set values outside boundaries to NaN 
-    dem, info, pos, cellsize, nodata = read_AsciiGrid(fpath+'dem_16m.asc')
-    #latitude, longitude arrays    
-    nrows, ncols=np.shape(dem)    
-    lon0=np.arange(pos[0], pos[0]+cellsize*ncols,cellsize)
-    lat0=np.arange(pos[1], pos[1]+cellsize*nrows,cellsize)
-    lat0=np.flipud(lat0) #why this is needed to get coordinates correct when plotting?
-
-    #catchment mask cmask ==1, np.NaN outside
-    cmask=dem.copy(); cmask[np.isfinite(cmask)]=1.0
-    
-    #flowacc, D-infinity, nr of draining cells
-    flowacc, _, _, _, _ = read_AsciiGrid(fpath +'flowaccum_16m.asc')
-    conv = np.nanmin(flowacc)  # to correct units in file
-    flowacc = flowacc / conv *cellsize**2 #in m2
-    #slope, degrees
-    slope, _, _, _, _ = read_AsciiGrid(fpath + 'slope_16m.asc')
-    #twi
-    twi, _, _, _, _ = read_AsciiGrid(fpath + 'twi_16m.asc')
-    
-    #Maastotietokanta water bodies: 1=waterbody
-    stream, _, _, _, _ = read_AsciiGrid(fpath +'vesielementit.asc')
-    stream[stream == 0.0] = np.NaN
-    stream[np.isfinite(stream)]=1.0    
-    #maastotietokanta peatlandmask
-    #peatm, _, _, _, _ = read_AsciiGrid(fpath + 'suo_mtk.asc')
-    peatm = np.ones([nrows, ncols])*np.NaN
-    #peatm[np.isfinite(peatm)]=1.0   
-    #maastotietokanta kalliomaski
-    rockm, _, _, _, _ = read_AsciiGrid(fpath +'kallioalue_16m.asc')
-    rockm[np.isfinite(rockm)]=1.0        
-    rockm = peatm.copy()
-            
-    """ stand data (MNFI)"""
-
-    #stand volume [m3ha-1]
-    vol, _, _, _, _ = read_AsciiGrid(fpath +'tilavuus.asc', setnans=False)
-    vol=vol*cmask
-    #indexes for cells not recognized in mNFI
-    ix_n=np.where((vol>=32727) | (vol==-9999) ) #no satellite cover or not forest land: assign arbitrary values 
-    ix_p=np.where((vol>=32727) & (peatm==1))#open peatlands: assign arbitrary values
-    ix_w=np.where((vol>=32727) & (stream==1)) #waterbodies: leave out
-    cmask[ix_w]=np.NaN #*********** NOTE: leave waterbodies out of catchment mask !!!!!!!!!!!!!!!!!!!!!!
-    vol[ix_n]=nofor['vol']; vol[ix_p]=opeatl['vol']; vol[ix_w]=np.NaN
-    #basal area [m2 ha-1]
-    ba, _, _, _, _ = read_AsciiGrid(fpath +'ppa.asc') 
-    ba[ix_n]=nofor['ba']; ba[ix_p]=opeatl['ba']; ba[ix_w]=np.NaN
-    
-   #tree height [m]
-    height, _, _, _, _ = read_AsciiGrid(fpath +'keskipituus.asc')
-    height=0.1*height #m  
-    height[ix_n]=nofor['height']; height[ix_p]=opeatl['height']; height[ix_w]=np.NaN
-    
-    #canopy closure [-]    
-    cf, _, _, _, _ = read_AsciiGrid(fpath +'latvuspeitto.asc')   
-    cfd, _, _, _, _ = read_AsciiGrid(fpath +'lehtip_latvuspeitto.asc')
-    cf=1e-2*cf; cfd=1e-2*cfd; #in fraction
-    cf[ix_n]=nofor['cf']; cf[ix_p]=opeatl['cf']; cf[ix_w]=np.NaN
-    
-    #stand age [yrs]
-    age, _, _, _, _ = read_AsciiGrid(fpath +'ika.asc')
-    age[ix_n]=nofor['age']; age[ix_p]=opeatl['age']; age[ix_w]=np.NaN
-    
-    #leaf biomasses and one-sided LAI
-    bmleaf_pine, _, _, _, _ = read_AsciiGrid(fpath +'bm_manty_neulaset.asc')
-    bmleaf_spruce, _, _, _, _ = read_AsciiGrid(fpath +'bm_kuusi_neulaset.asc')
-    bmleaf_decid, _, _, _, _ = read_AsciiGrid(fpath +'bm_lehtip_neulaset.asc')
-   # bmleaf_pine[ix_n]=np.NaN; bmleaf_spruce[ix_n]=np.NaN; bmleaf_decid[ix_n]=np.NaN;
-    
-    LAI_pine=1e-3*bmleaf_pine*SLA['pine'] #1e-3 converts 10kg/ha to kg/m2
-    LAI_pine[ix_n]=nofor['LAIpine']; LAI_pine[ix_p]=opeatl['LAIpine']; age[ix_w]=np.NaN
-    
-    LAI_spruce=1e-3*bmleaf_spruce*SLA['spruce'] #1e-3 converts 10kg/ha to kg/m2
-    LAI_spruce[ix_n]=nofor['LAIspruce']; LAI_spruce[ix_p]=opeatl['LAIspruce']; age[ix_w]=np.NaN
-    
-    LAI_conif = LAI_spruce + LAI_pine
-    
-    LAI_decid=1e-3*bmleaf_decid*SLA['decid'] #1e-3 converts 10kg/ha to kg/m2
-    LAI_decid[ix_n]=nofor['LAIdecid']; LAI_decid[ix_p]=opeatl['LAIdecid']; age[ix_w]=np.NaN        
-    
-    bmroot_pine, _, _, _, _ = read_AsciiGrid(fpath +'bm_manty_juuret.asc')
-    bmroot_spruce, _, _, _, _ = read_AsciiGrid(fpath +'bm_kuusi_juuret.asc')
-    bmroot_decid, _, _, _, _ = read_AsciiGrid(fpath +'bm_lehtip_juuret.asc')         
-    bmroot=1e-2*(bmroot_pine + bmroot_spruce + bmroot_decid) #1000 kg/ha 
-    bmroot[ix_n]=nofor['bmroot']; bmroot[ix_p]=opeatl['bmroot']; age[ix_w]=np.NaN    
-    
-    """
-    gtk soilmap: read and re-classify into 4 texture classes
-    #GTK-pintamaalaji grouped to 4 classes (Samuli Launiainen, Jan 7, 2017)
-    #Codes based on maalaji 1:20 000 AND ADD HERE ALSO 1:200 000
-    """
-    CoarseTextured = [195213,195314,19531421,195313,195310]
-    MediumTextured = [195315,19531521,195215,195214,195601,195411,195112,195311,195113,195111,195210,195110,195312]
-    FineTextured = [19531521, 195412,19541221,195511,195413,195410,19541321,195618]
-    Peats = [195512, 195513, 195514, 19551820, 19551822, 19551890, 19551891, 19551892]
-    Water =[195603]
-
-    gtk_s, _, _, _, _ = read_AsciiGrid(fpath +'soil.asc') 
-    
-    r,c=np.shape(gtk_s);
-    soil=np.ravel(gtk_s); del gtk_s
-    soil[np.in1d(soil, CoarseTextured)]=1.0 #; soil[f]=1; del f
-    soil[np.in1d(soil, MediumTextured)]=2.0
-    soil[np.in1d(soil, FineTextured)]=3.0
-    soil[np.in1d(soil, Peats)]=4.0
-    soil[np.in1d(soil, Water)]=-1.0
-        
-    #soil[soil>4.0]=-1.0;
-    #reshape back to original grid
-    soil=soil.reshape(r,c)*cmask; del r,c
-    soil[np.isfinite(peatm)]=4.0
-    #update waterbody mask    
-    ix=np.where(soil==-1.0)
-    stream[ix]=1.0     
-    
-    # update catchment mask so that water bodies are left out (SL 20.2.18)
-    #cmask[soil == -1.0] = np.NaN
-    cmask[soil <= 0] = np.NaN
-    soil = soil * cmask
-
-    #catchment outlet location
-    (iy,ix)=np.where(flowacc==np.nanmax(flowacc));
-    loc={'lat':lat0[iy],'lon':lon0[ix],'elev': np.nanmean(dem)}
-    
-    # harvester driving route and location of test sites
-
-    #route, _, _, _, _ = read_AsciiGrid(fpath +'route.asc')
-    #test_sites, _, _, _, _ = read_AsciiGrid(fpath +'test_sites.asc')
-          
-    GisData={'cmask':cmask, 'dem':dem, 'flowacc': flowacc, 'slope': slope, 'twi': twi, 'soilclass':soil, 'peatm':peatm, 'stream': stream,\
-    'rockm': rockm,'LAI_pine': LAI_pine, 'LAI_spruce': LAI_spruce, 'LAI_conif': LAI_conif, 'LAI_decid': LAI_decid, 'bmroot': bmroot, 'ba': ba, 'hc': height,\
-    'vol':vol,'cf':cf, 'cfd': cfd,'age': age, 'cellsize': cellsize, 'info': info, 'lat0':lat0, 'lon0':lon0,'loc':loc}  # 'route': route, 'test_sites': test_sites,  
-
-        
-
-    if plotgrids is True:
-        #%matplotlib qt
-        #xx,yy=np.meshgrid(lon0, lat0)
-        plt.close('all')
-        
-        plt.figure()        
-        plt.subplot(221);plt.imshow(dem); plt.colorbar(); plt.title('DEM (m)');plt.plot(ix,iy,'rs')
-        plt.subplot(222);plt.imshow(twi); plt.colorbar(); plt.title('TWI')
-        plt.subplot(223);plt.imshow(slope); plt.colorbar(); plt.title('slope(deg)')
-        plt.subplot(224);plt.imshow(flowacc); plt.colorbar(); plt.title('flowacc (m2)')
-        #
-        plt.figure()
-        plt.subplot(221); plt.imshow(soil); plt.colorbar(); plt.title('soiltype')
-        mask=cmask.copy()*0.0
-        mask[np.isfinite(peatm)]=1; mask[np.isfinite(rockm)]=2; mask[np.isfinite(stream)]=3; 
-        plt.subplot(222); plt.imshow(mask); plt.colorbar(); plt.title('masks')
-        plt.subplot(223); plt.imshow(LAI_pine+LAI_spruce + LAI_decid); plt.colorbar(); plt.title('LAI (m2/m2)')
-        plt.subplot(224); plt.imshow(cf); plt.colorbar(); plt.title('cf (-)')
-        
-        plt.figure()
-        plt.subplot(221);plt.imshow(vol); plt.colorbar(); plt.title('vol (m3/ha)')
-        plt.subplot(222);plt.imshow(height); plt.colorbar(); plt.title('hc (m)')
-        plt.subplot(223);plt.imshow(ba); plt.colorbar(); plt.title('ba (m2/ha)')
-        plt.subplot(224);plt.imshow(age); plt.colorbar(); plt.title('age (yr)')
-    
-    if plotdistr is True:
-        plt.figure()        
-        #twi
-        twi0=twi[np.isfinite(twi)]; vol=vol[np.isfinite(vol)]; lai=LAI_pine + LAI_spruce + LAI_decid
-        lai=lai[np.isfinite(lai)];soil0=soil[np.isfinite(soil)]
-        
-        plt.subplot(221); plt.hist(twi0,bins=100,color='b',alpha=0.5,normed=True); plt.ylabel('f');plt.ylabel('twi')
-       
-        s=np.unique(soil0); #print(s)
-        colcode='rgcym'
-        for k in range(0,len(s)):
-            print(k)
-            a=twi[np.where(soil==s[k])]; a=a[np.isfinite(a)]
-            plt.hist(a,bins=50,alpha=0.5,color=colcode[k], normed=True, label='soil ' +str(s[k]))
-        plt.legend(); plt.show()
-       
-        plt.subplot(222); plt.hist(vol,bins=100,color='k',normed=True); plt.ylabel('f');plt.ylabel('vol')
-        plt.subplot(223); plt.hist(lai,bins=100,color='g',normed=True); plt.ylabel('f');plt.ylabel('lai')
-        plt.subplot(224); plt.hist(soil0, bins=5,color='r',normed=True); plt.ylabel('f');plt.ylabel('soiltype')
-
-        
-    return GisData
-
 """ ********* Get Forcing data: SVE catchments ****** """
 
 def read_FMI_weather(ID, start_date, end_date, sourcefile, CO2=380.0):
@@ -986,6 +794,7 @@ def read_FMI_weather(ID, start_date, end_date, sourcefile, CO2=380.0):
     # -H2O partial pressure (hPa)
 
     sourcefile = os.path.join(sourcefile)
+
     #ID = int(ID)
 
     # import forcing data
@@ -994,6 +803,7 @@ def read_FMI_weather(ID, start_date, end_date, sourcefile, CO2=380.0):
                       'latitude', 't_mean', 't_max', 't_min', 'rainfall',
                       'radiation', 'hpa', 'lamposumma_v', 'rainfall_v'],
                       parse_dates=['aika'],encoding="ISO-8859-1")
+    
     time = pd.to_datetime(fmi['aika'], format='%Y%m%d')
 
     fmi.index = time
@@ -1022,16 +832,15 @@ def read_FMI_weather(ID, start_date, end_date, sourcefile, CO2=380.0):
     fmi['doy'] = fmi.index.dayofyear
     fmi = fmi.drop(['aika'], axis=1)
     # replace nan's in prec with 0.0
-    fmi['Prec'][np.isnan(fmi['Prec'])] = 0.0
-    
+    #fmi['Prec'][np.isnan(fmi['Prec'])] = 0.0
+    fmi['Prec']= fmi['Prec'].fillna(value=0.0)
     # add CO2 concentration to dataframe
     fmi['CO2'] = float(CO2)
     
     # get desired period
     fmi = fmi[(fmi.index >= start_date) & (fmi.index <= end_date)]
-    #if ID > str(0):
-    #    fmi = fmi[fmi['ID'] == ID]
- 
+#    if ID > 0:
+#        fmi = fmi[fmi['ID'] == ID]
     return fmi
 
 """ get forcing data from climate projections (120 years) """
@@ -1118,92 +927,6 @@ def read_SVE_runoff(ID, start_date,end_date, sourcefile):
     return dat
 
 
-""" ************ SVE valuma-alueet: get data from Vesidata -database ********************** """
-
-def vdataQuery(alue, alku, loppu, kysely, fname=None):
-    """
-    Runs Vesidata html standard queries    
-    
-    IN:
-        alue - alueid (int)
-        alku - '2015-05-25', (str)
-        loppu -'2015-06-01', (str)
-        kysely -'raw', 'wlevel', 'saa', (str)
-        fname - filename for saving ascii-file
-    OUT:
-        dat - pd DataFrame; index is time and keys are from 1st line of query
-    Samuli L. 25.4.2016; queries by Jukka Pöntinen & Anne Lehto
-    
-    käyttöesim1: https://taimi.in.metla.fi/cgi/bin/12.vesidata_haku.pl?id=3&alku=2016-01-25&loppu=2016-02-10&kysely=wlevel 
-    käyttöesim2: https://taimi.in.metla.fi/cgi/bin/12.vesidata_haku.pl?id=Porkkavaara&alku=2016-01-25&loppu=2016-02-10&kysely=raw
-    käyttöesim3: https://taimi.in.metla.fi/cgi/bin/12.vesidata_haku.pl?id=Porkkavaara&alku=2016-01-25&loppu=2016-02-10&kysely=saa
-    
-    vaaditaan parametrit:
-    id = Alueen nimi tai numero, esim Kivipuro tai 33, joka on Kivipuron aluenumero, 
-         annual-ryhmän kyselyyn voi antaa id=all, jolloin haetaan kaikki alueet
-    
-    alku = päivä,josta lähtien haetaan 2016-01-25
-    
-    loppu = päivä,johon saakka haetaan 2016-02-10
-    
-    kysely: 
-    'wlevel' = haetaan vedenkorkeusmuuttujat tietyssä järjestyksessä
-    'raw' = haetaan näiden lisäksi kaikki 'raw'-ryhmän muuttujat
-    'saa' = haetaan päivittäinen sää, eli sademäärä ja keskilämpötila 
-    'annual' = haetaan vuoden lasketut tulokset, päivämäärän alkupäivä on vuoden 1. päivä, loppupäivä esim. vuoden toinen päivä
-    'craw'= haetaan kaikki tämän ryhmän muuttujat 
-    'dload'= haetaan kaikki tämän ryhmän muuttujat 
-    'roff'= haetaan kaikki tämän ryhmän muuttujat 
-    'wquality'= haetaan kaikki tämän ryhmän muuttujat 
-
-    """
-
-    import urllib2, os, shutil
-    import pandas as pd
-    #addr='https://taimi.in.metla.fi/cgi/bin/12.vesidata_haku.pl?id=all&alku=2014-01-01&loppu=2014-10-25&kysely=annual' KAIKKI ANNUAL-MUUTTUJAT
-    #addr='https://taimi.in.metla.fi/cgi/bin/vesidata_haku.pl?id=Liuhapuro&alku=2015-05-25&loppu=2015-06-10&kysely=raw'
-    
-    addr='https://taimi.in.metla.fi/cgi/bin/vesidata_haku.pl?id=%s&alku=%s&loppu=%s&kysely=%s' %(str(alue), alku, loppu, kysely)
-    ou='tmp.txt'
-    
-    f=urllib2.urlopen(addr) #open url, read to list and close
-    r=f.read().split("\n")
-    f.close()
-    
-    g=open(ou, 'w') #open tmp file, write, close
-    g.writelines("%s\n" % item for item in r)
-    g.close()
-    
-    #read  'tmp.txt' back to dataframe
-    if kysely is 'annual': #annual query has different format
-        dat=pd.read_csv(ou)
-        f=dat['v_alue_metodi']
-        yr=[]; alue=[]; mtd=[]        
-        for k in range(0, len(f)):
-            yr.append(float(f[k].split('a')[0]))
-            mtd.append(int(f[k].split('d')[1]))
-            x=f[k].split('m')[0]
-            alue.append(int(x.split('e')[1]))
-        dat=dat.drop('v_alue_metodi',1)
-        dat.insert(0,'alue_id', alue); dat.insert(1, 'vuosi',yr); dat.insert(2,'mtd', mtd)
-        
-    else: #...than the other queries
-        dat=pd.read_csv(ou,index_col=0)
-        dat.index=dat.index.to_datetime() #convert to datetime
-    
-    
-    if kysely is 'wlevel': #manipulate column names
-        cols=list(dat.columns.values)
-        h=[]  
-        for item in cols:
-            h.append(item.split("=")[1])
-        dat.columns=h
-    
-    if fname is not None: #copy to fname, remove ou
-        shutil.copy(ou, fname)
-    os.remove(ou)
-
-    return dat    
 
 """ ************************ Forcing data, sitefile ************************** """
 def read_FMI_weatherdata(forcfile, fyear,lyear, asdict=False):
@@ -1351,34 +1074,399 @@ def read_setup(inifile):
     ptop = pp['Topmodel']
 
     return pgen, pcpy, pbu, ptop
+
+
+def get_clear_cuts_ari(pgen, cmask):
+    import os
+    import datetime
+    from calendar import monthrange
     
-#def read_soil_properties(soilparamfile):
-#    """
-#    reads soiltype-dependent hydrol. properties from text file
-#    IN: soilparamfile - path to file
-#    OUT: pp - dictionary of soil parameters
-#    """
-#    soilparamfile = os.path.join(spathy_path, 'ini', soilparamfile)
-#    import configparser
-#
-#    cfg = configparser.ConfigParser()
-#    cfg.read(soilparamfile)
-#    # print cfg
-#    pp = {}
-#    for s in cfg.sections():
-#        section = s.encode('ascii', 'ignore')
-#        pp[section] = {}
-#        for k, v in cfg.items(section):
-#            key = k.encode('ascii', 'ignore')
-#            val = v.encode('ascii', 'ignore')
-#
-#            if key == 'gtk_code':  # and len(val)>1:
-#                val = map(int, val.split(','))
-#                pp[section][key] = val
-#            else:
-#                pp[section][key] = float(val)
-#    del cfg
-#
-#    return pp
-#    
-#    
+    clear_cuts ={}
+    scens=[f for f in os.listdir(pgen['gis_scenarios']) if f.endswith('.asc')]
+    if scens:
+        for s in scens:
+            m = s[4:6]        
+            yr = s[:4]
+            days = monthrange(int(yr), int(m))   #locate cuttings to the last day of month
+            d = days[1] #s[6:8]    
+            key=datetime.date(int(yr),int(m),int(d))
+            cut, _, _, _, _ = read_AsciiGrid(pgen['gis_scenarios'] + s)
+            ix = np.where(np.isfinite(cmask)) 
+            cut2 = cut[ix].copy()
+            clear_cuts[key]=cut2
+    else:
+        print ('No available clear-cut scenario rasters in ', pgen['gis_scenarios'])
+        key=datetime.date(int(2900),int(12),int(31))
+        cut = cmask.copy()
+        ix = np.where(np.isfinite(cmask)) 
+        cut2 = cut[ix].copy()
+        cut2[:] = np.NaN
+        clear_cuts[key]=cut2.copy()
+    return clear_cuts
+
+def get_clear_cuts(pgen, cmask_cc, cmask):
+    import os
+    import datetime
+    from calendar import monthrange
+    
+    clear_cuts ={}
+    scens=[f for f in os.listdir(pgen['gis_scenarios']) if f.endswith('.asc')]
+    for s in scens:
+        try:
+            #m = s[4:6]        
+            #yr = s[:4]
+            m = s[-8:-6]
+            yr = s[-12:-8]
+            
+            days = monthrange(int(yr), int(m))   #locate cuttings to the last day of month
+            d = days[1] #s[6:8]    
+            key=datetime.date(int(yr),int(m),int(d))
+            cut, _, _, _, _ = read_AsciiGrid(pgen['gis_scenarios'] + s)
+            #print(np.shape(cut))
+            ix = np.where(np.isfinite(cmask)) 
+            #unique, counts = np.unique(ix, return_counts=True)
+            #print('ix finite cmask',unique, counts)
+            #cut2 = cut[ix].copy()
+            #print(s, 'cut2',np.shape(cut2))
+            #unique, counts = np.unique(cut2, return_counts=True)
+            #print('cut2',unique, counts)
+            cut3= cut * cmask_cc
+            cut4= cut3[ix].copy()   
+            #unique, counts = np.unique(cut4, return_counts=True)
+            #print('cut4',unique, counts)
+            #print(s,'cut4',np.shape(cut4))
+            clear_cuts[key]=cut4
+            print('clear cut dates', key)
+        except:
+            print ('No available clear-cut scenario rasters in ', pgen['gis_scenarios'])
+
+    return clear_cuts
+	
+def get_clear_cuts_area(pgen, cmask_cc):
+    import os
+    import datetime
+    import numpy as np
+    clear_cuts ={}
+    scens=[f for f in os.listdir(pgen['gis_scenarios']) if f.endswith('.asc')]
+    for s in scens:
+        try:
+            #d = '01' #s[-6:-4]      Muuta tämä toisinpäin, aktivoi  
+            d = s[-6:-4]      
+            #m = '02' #s[-9:-7]        
+            m = s[-8:-6]
+            yr = s[-12:-8]
+            key=datetime.date(int(yr),int(m),int(d))
+            cut, _, _, _, _ = read_AsciiGrid(pgen['gis_scenarios'] + s)
+            ic = np.where(cut==1)
+            print(np.shape(ic))
+            ix = np.where(np.isfinite(cmask_cc)) 
+            print(np.shape(ix))
+            cut2 = cut[ix].copy()
+            ixc = np.where(cut2==1)
+            clear_cuts[key]=cut2
+        except:
+            print ('No available clear-cut scenario rasters in ', pgen['gis_scenarios'])
+    area_ofcc=[]
+    for i in range(len(clear_cuts.keys())):
+        area_ofcc.append(np.nansum(clear_cuts.get(clear_cuts.keys()[i]))*16*16/10000)
+    area_ofcc= np.nansum(area_ofcc)
+    #data = {'basin':pgen['gis_folder'], 'areaofcc_ha':area_ofcc}
+    #area_ofcc = pd.DataFrame(data=data)                                          # trimming according to time
+    #area_ofcc=area_ofcc.set_index('basin')        
+    return area_ofcc
+
+def get_clear_cuts_times(pgen, cmask_cc):
+    import os
+    import datetime
+    import pandas
+    clear_cuts ={}
+    scens=[f for f in os.listdir(pgen['gis_scenarios']) if f.endswith('.asc')]
+    for s in scens:
+        try:
+            #d = '01' #s[-6:-4]      Muuta tämä toisinpäin, aktivoi  
+            d = s[-6:-4]      
+            #m = '02' #s[-9:-7]        
+            m = s[-8:-6]
+            yr = s[-12:-8]
+            key=datetime.date(int(yr),int(m),int(d))
+            cut, _, _, _, _ = read_AsciiGrid(pgen['gis_scenarios'] + s)
+            ix = np.where(np.isfinite(cmask_cc)) 
+            cut2 = cut[ix].copy()
+            clear_cuts[key]=cut2
+        except:
+            print ('No available clear-cut scenario rasters in ', pgen['gis_scenarios'])
+
+    FORC = read_FMI_weather(pgen['catchment_id'],
+                                        pgen['start_date'],
+                                        pgen['end_date'],
+                                        sourcefile=pgen['forcing_file'])
+    Nsteps = len(FORC)
+    cc_area=[]
+    datelist=[]
+    
+    for k in range(0, Nsteps):   #keep track on dates
+        current_date = datetime.datetime.strptime(pgen['start_date'],'%Y-%m-%d').date() + datetime.timedelta(days=k)
+        datelist.append(current_date)
+        if current_date in clear_cuts.keys():
+            #print((np.nansum(clear_cuts.get(current_date))*16*16/10000))    
+            cc_area.append(np.nansum(clear_cuts.get(current_date))*16*16/10000)
+        else:
+            cc_area.append(0)   
+    cc_area_date = pandas.DataFrame(data={"datetime": datelist,"area_of_cc":cc_area})         
+    return cc_area_date
+
+def get_clear_cuts_pery(pgen, cmask_cc, cmask):
+    import os
+    import datetime
+    import pandas
+    import numpy as np
+    from spafhy_io import create_catchment, read_FMI_weather,  read_AsciiGrid
+    clear_cuts ={}
+    scens=[f for f in os.listdir(pgen['gis_scenarios']) if f.endswith('.asc')]
+    for s in scens:
+        try:
+            #d = '01' #s[-6:-4]      Muuta tämä toisinpäin, aktivoi  
+            d = s[-6:-4]      
+            #m = '02' #s[-9:-7]        
+            m = s[-8:-6]
+            yr = s[-12:-8]
+            key=datetime.date(int(yr),int(m),int(d))
+            cut, _, _, _, _ = read_AsciiGrid(pgen['gis_scenarios'] + s)
+            ix = np.where(np.isfinite(cmask_cc)) 
+            cut2 = cut[ix].copy()
+            clear_cuts[key]=cut2
+        except:
+            print ('No available clear-cut scenario rasters in ', pgen['gis_scenarios'])
+
+    FORC = read_FMI_weather(pgen['catchment_id'],
+                                        pgen['start_date'],
+                                        pgen['end_date'],
+                                        sourcefile=pgen['forcing_file'])
+    Nsteps = len(FORC)
+    datelist=[]
+    
+    cc_dsdist= cmask.copy()
+    ix = np.where(np.isfinite(cmask_cc))
+    cc_dsdist1= cc_dsdist[ix].copy()
+    cc_dsdist2=[]
+    cc_dsdist3= cc_dsdist1
+    cc_dsdist4=[]
+    res_time, _, _, _, _ = read_AsciiGrid(pgen['gis_folder']+'res_timeraster.asc')
+    #cum_clear_cuts = gisdata['cmask'].copy()
+    #ix = np.where(np.isfinite(cum_clear_cuts))
+    #cum_clear_cuts[ix]=0
+    gisdata = create_catchment(pgen, fpath=pgen['gis_folder'],
+                                           plotgrids=False, plotdistr=False)
+    dsdistlist=cmask.copy()
+    dsdistlist= gisdata['dsdist'][ix].copy()
+    restimelist=cmask.copy()
+    restimelist= res_time[ix].copy()
+    
+    for k in range(0, Nsteps):   #keep track on dates
+        current_date = datetime.datetime.strptime(pgen['start_date'],'%Y-%m-%d').date() + datetime.timedelta(days=k)
+        datelist.append(current_date)
+        if current_date in clear_cuts.keys():
+            #print((np.nansum(clear_cuts.get(current_date))*16*16/10000))    
+            cc_dsdist1 = np.multiply(clear_cuts.get(current_date),dsdistlist) 
+            cc_dsdist2.append(np.nanmean(cc_dsdist1))
+            cc_dsdist3 = np.multiply(clear_cuts.get(current_date),restimelist) 
+            cc_dsdist4.append(np.nanmean(cc_dsdist3))            
+        else:
+            cc_dsdist2.append(0)
+            cc_dsdist4.append(0)
+    cc_dists_date = pandas.DataFrame(data={"datetime": datelist,"mean_dsdist_cc":cc_dsdist2, "mean_restime_cc":cc_dsdist4})         
+    #cc_dists_date = pandas.DataFrame(data={"datetime": datelist,"mean_dsdist_cc":cc_dsdist2})         
+    return cc_dists_date
+
+def initialize_netcdf_res(variables, pgen,
+                      cat,
+                      scen,
+                      forcing,
+                      filepath,
+                      filename,
+                      description='nutrient loading results'):
+    """ netCDF4 format output file initialization
+    Args:
+        variables (list): list of variables to be saved in netCDF4
+        cat (str): catchment id
+        scen (scen): logging scenario
+        ###dtimey (scen): dtime - nr timesteps, dtime=None --> unlimited,  vuositulokset
+        forcing: forcing data (pd.dataframe) / weather data used
+        forcing: forcing data (pd.dataframe) / weather scen name
+
+        filepath: path for saving results pgen['output_folder']
+        filename: filename='load_res.nc'
+    """
+    from netCDF4 import Dataset, date2num
+    from datetime import datetime
+    #pyAPES_folder = os.getcwd()
+    #filepath = os.path.join(pyAPES_folder, filepath)
+
+    #if not os.path.exists(filepath):
+    #    os.makedirs(filepath)
+
+    ff = os.path.join(filepath, filename)
+
+    # create dataset and dimensions
+    ncf = Dataset(ff, 'w')
+    #ncf = Dataset(filename, 'w')
+    forc_scen=pgen['forcing_file']
+    ncf.description = description + str(cat)+ str(scen)+ str(forc_scen)
+    ncf.history = 'created ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ncf.source = 'NutSpaFHy v.1.0'
+    #ncf.createDimension('dtimey', dtimey)
+    ncf.createDimension('date', None)
+    #ncf.createDimension('forc_scen', 8)
+    #ncf.createDimension('cat', 33)
+    #ncf.createDimension('scen', 104)
+#    ncf.createDimension('forcing_scen', forcing)
+    
+    time = ncf.createVariable('date', 'f8', ('date',))
+    time.units = 'days since 0001-01-01 00:00:00.0' #vuosittain olis parempi
+    #     "day as %Y%m%d" ;
+    time.calendar = 'standard'
+#    tvec = [k.to_datetime() for k in forcing.index] is depricated
+    tvec = [pd.to_datetime(k) for k in forcing.index]
+    time[:] = date2num(tvec, units=time.units, calendar=time.calendar)
+
+    #Nsto=ncf.createVariable('/nut/nsto','f4',('dtime','dlat','dlon',)); Nsto.units='soil N storage [kgha-1]'
+    #n_expkg2=ncf.createVariable('n_expkg2','f4',('dtime','scen','forcing',)); n_expkg2.units='N outflux in m3, in kg'
+
+    for var in variables:#
+        var_name = var[0]
+        var_unit = var[1]
+        var_dim = var[2]
+
+        #if var_name == 'canopy_planttypes' or var_name == 'ffloor_groundtypes':
+        #    variable = ncf.createVariable(
+        #        var_name, 'S10', var_dim)
+        #else:
+        #    variable = ncf.createVariable(
+        #            var_name, 'f4', var_dim)
+        variable = ncf.createVariable(
+                    var_name, 'f4', var_dim) #f4 :16bit floating point number
+        variable.units = var_unit
+
+    return ncf, ff
+    
+
+def get_log_area_mp(pgen, cmask_cc, smc):
+    import os
+    import datetime
+    import pandas
+    import numpy as np
+    from spafhy_io import create_catchment, read_FMI_weather,  read_AsciiGrid
+    clear_cuts ={}
+    clear_cuts_m={}
+    scens=[f for f in os.listdir(pgen['gis_scenarios']) if f.endswith('.asc')]
+    for s in scens:
+        try:
+            d = s[-6:-4]      
+            m = s[-8:-6]
+            yr = s[-12:-8]
+            key=datetime.date(int(yr),int(m),int(d))
+            cut, _, _, _, _ = read_AsciiGrid(pgen['gis_scenarios'] + s)
+            ix = np.where(np.isfinite(cmask_cc)) 
+            cut2 = cut[ix].copy()
+            clear_cuts[key]=cut2
+            ixm = np.equal(smc,1)
+            cut_m = cut[ixm]
+            clear_cuts_m[key]=cut_m
+
+        except:
+            print ('No available clear-cut scenario rasters in ', pgen['gis_scenarios'])
+
+    FORC = read_FMI_weather(pgen['catchment_id'],
+                                        pgen['start_date'],
+                                        pgen['end_date'],
+                                        sourcefile=pgen['forcing_file'])
+    Nsteps = len(FORC)
+    datelist=[]
+    
+    #gisdata = create_catchment(pgen, fpath=pgen['gis_folder'],
+    #                                       plotgrids=False, plotdistr=False)
+    clear_cuts_mha=[]
+    clear_cuts_pha=[]
+    #dsdistlist=cmask.copy()
+    #dsdistlist= gisdata['dsdist'][ix].copy()
+    #restimelist=cmask.copy()
+    #restimelist= res_time[ix].copy()
+    
+    for k in range(0, Nsteps):   #keep track on dates
+        current_date = datetime.datetime.strptime(pgen['start_date'],'%Y-%m-%d').date() + datetime.timedelta(days=k)
+        datelist.append(current_date)
+        if current_date in clear_cuts_m.keys():
+            clear_cuts_mha.append(np.nansum(clear_cuts_m.get(current_date))*16*16/10000)
+            clear_cuts_pha.append((np.nansum(clear_cuts.get(current_date))*16*16/10000)-(np.nansum(clear_cuts_m.get(current_date))*16*16/10000))
+        else:
+            clear_cuts_mha.append(0)
+            clear_cuts_pha.append(0)
+    log = pandas.DataFrame(data={"datetime": datelist,"log_mineral[ha]":clear_cuts_mha, "log_peat[ha]":clear_cuts_pha})         
+    #cc_dists_date = pandas.DataFrame(data={"datetime": datelist,"mean_dsdist_cc":cc_dsdist2})         
+    return log
+
+
+
+
+def write_ncf_res(gisdata,log,results,ncf,cat, scen):
+
+    ncf['datetime'][:]=results['date'].to_numpy()
+    ncf['date_2'][:]=results['datetime'].to_numpy()
+    ncf['runoff[mday-1]'][:]=results['runoff[m/day]'].to_numpy()
+    ncf['nexport[kgha-1]'][:]=results['nexport[kg/ha]'].to_numpy()
+    ncf['nconc[mgl-1]'][:]=results['nconc[mg/l]'].to_numpy()
+    ncf['pexport[kgha-1]'][:]=results['pexport[kg/ha]'].to_numpy()
+    ncf['pconc[mgl-1]'][:]=results['pconc[mg/l]'].to_numpy()
+    ncf['nexport[kg]'][:]=results['nexport[kg]'].to_numpy()
+    ncf['pexport[kg]'][:]=results['pexport[kg]'].to_numpy()
+    ncf['log_mineral[ha]'][:]=log['log_mineral[ha]'].to_numpy()
+    ncf['log_peat[ha]'][:]=log['log_peat[ha]'].to_numpy()
+    ncf['cat_area[ha]'][:]=(np.nansum(gisdata['cmask'])*gisdata['cellsize']**2)/1e4
+
+def weather_fig(df):
+
+    sns.set()
+    #import string
+    #printable = set(string.printable)
+    fs=12
+    fig = plt.figure(num='Susi - weather data', figsize=[15.,8.], facecolor='#C1ECEC')  #see hex color codes from https://www.rapidtables.com/web/color/html-color-codes.html
+    municipality = df['Kunta'][0]   
+    #fig.suptitle('Weather data, '+ filter(lambda x: x in printable, municipality), fontsize=18)
+    ax1 = fig.add_axes([0.05,0.55,0.6,0.35])                             #left, bottom, width, height
+    ax1.plot(df.index, df['Prec'].values, 'b-', label='Rainfall')
+    ax1.set_xlabel('Time', fontsize=fs)
+    ax1.set_ylabel('Rainfall, mm', fontsize=12)
+    ax1.legend(loc='upper left')
+    ax11 = ax1.twinx()
+    ax11.plot(df.index, np.cumsum(df['Prec'].values), 'm-', linewidth=2., label='Cumulative rainfall')
+    ax11.set_ylabel('Cumulative rainfall [mm]', fontsize = fs)
+    ax11.legend(loc='upper right')
+
+    annual_prec = df['Prec'].resample('A').sum()
+    ax2 =fig.add_axes([0.73, 0.55, 0.25, 0.35])
+    
+    t1 = 'Mean annual rainfall ' + str(np.round(np.mean(annual_prec.values))) + ' mm'    
+    ax2.set_title(t1, fontsize = 14)
+    y_pos = np.arange((len(annual_prec)))
+    plt.bar(y_pos, annual_prec.values, align='center', alpha = 0.5)    
+    plt.xticks(y_pos, annual_prec.index.year, rotation = 45)
+    ax2.set_ylabel('mm')
+
+    zeroline =np.zeros(len(df.index))
+    ax3 = fig.add_axes([0.05,0.08,0.6,0.35])
+    ax3.plot(df.index, df['T'], 'g', linewidth = 0.5)
+    ax3.plot(df.index, zeroline, 'b-')
+    ax3.fill_between(df.index, df['T'],0, where=df['T']<0.0, facecolor='b', alpha=0.3)
+    ax3.fill_between(df.index, df['T'],0, where=df['T']>=0.0, facecolor='r', alpha=0.3)
+    ax3.set_ylabel('Air temperature, $^\circ$ C', fontsize = fs)
+
+    annual_temp = df['T'].resample('A').mean()
+    t2 = 'Mean annual temperature ' + str(np.round(np.mean(annual_temp.values), 2)) + '  $^\circ$ C'    
+    
+    ax4 =fig.add_axes([0.73, 0.08, 0.25, 0.35])
+    ax4.set_title(t2, fontsize = 14)
+    y_pos = np.arange((len(annual_temp)))
+    plt.bar(y_pos, annual_temp.values, align='center', alpha = 0.5)    
+    plt.xticks(y_pos, annual_temp.index.year, rotation = 45)
+    ax4.set_ylabel(' $^\circ$ C', fontsize = fs)
+    plt.show()
