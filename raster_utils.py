@@ -32,7 +32,7 @@ def convert_peruskarttarasteri(fp, epsg_code='3067'):
     x = np.asarray(rgb, dtype=int)
     img.close()
     
-    # create new rasteriodataset
+    # create new rasteriodataset in tif-format
     outfile = fp.split('.')[0] + '.tif'
     rout = rasterio.open(outfile, 'w',
                          driver='GTiff',
