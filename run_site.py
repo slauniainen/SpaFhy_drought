@@ -24,7 +24,7 @@ eps = np.finfo(float).eps
 """ paths defined in parameters"""
 from harvests_2021 import operations
 
-for siteid in range(1, 13):
+for siteid in [2, 9]: #(range(1, 13):
     plt.close('all')
     #siteid = 12
     print(siteid)
