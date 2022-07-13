@@ -1,6 +1,6 @@
-## TRAM_SpaFHy
+## SpaFHy_drought
 
-SpaFHy (Launiainen et al. 2019 HESS) setup for TRAM-project to simulate dynamic
-TWI-index (local Saturation deficit) and root zone vol. soil moisture variability
-during the 2021 harvest operations.
+SpaFHy (Launiainen et al. 2019 HESS) setup for Forests - manuscript to demonstrate
+use of derived soil hydraulic properties in soil moisture and drought-risk modeling
 
+Forked from TRAM_SpaFHy

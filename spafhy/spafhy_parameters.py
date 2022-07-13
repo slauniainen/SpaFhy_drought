@@ -13,14 +13,14 @@ Created on Mon Jun 25 18:34:12 2018
 
 def parameters():
     pgen = {'catchment_id': None,
-            'gis_folder': r'c:\projects\tram\spafhy_data',
-            'forcing_file': r'c:\projects\tram\spafhy_data\weather',
-            'runoff_file': None, #str(pathlib.Path('../SpaFHyData/Runoff/Runoffs_SVEcatchments_mmd.csv')),
+            'gis_folder': r'data/C14/',
+            'forcing_file': r'data/SVE_saa.csv',
+            'runoff_file': r'data/Runoffs_SVEcatchments_mmd.csv',
             'pickle_file': None,
-            'ncf_file': r'c:\projects\tram\spafhy_results',
-            'start_date': '2018-01-01',
-            'end_date': '2021-12-31',
-            'spinup_end': '2018-12-31',
+            'ncf_file': r'results',
+            'start_date': '2000-01-01',
+            'end_date': '2016-12-31',
+            'spinup_end': '2000-12-31',
             'dt': 86400.0,
             'spatial_cpy': True,
             'spatial_soil': True     
@@ -92,7 +92,7 @@ def parameters():
            #organic (moss) layer
            'org_depth': 0.04, # depth of organic top layer (m)
            'org_poros': 0.9, # porosity (-)
-           'org_fc': 0.3, # field capacity (-)
+           'org_fc': 0.31, # field capacity (-)
            'org_rw': 0.24, # critical vol. moisture content (-) for decreasing phase in Ef
            'maxpond': 0.0, # max ponding allowed (m)
            #initial states: rootzone and toplayer soil saturation ratio [-] and pond storage [m]
@@ -103,7 +103,7 @@ def parameters():
     
     # TOPMODEL
     ptop = {'dt': 86400.0, # timestep (s)
-            'm': 0.01, # scaling depth (m)
+            'm': 0.007, # Paunulanpuro # generic is 0.01, # scaling depth (m)
             'ko': 0.001, # transmissivity parameter (ms-1)
             'twi_cutoff': 99.5,  # cutoff of cumulative twi distribution (%)
             'so': 0.05 # initial saturation deficit (m)
@@ -111,6 +111,85 @@ def parameters():
     
     return pgen, pcpy, pbu, ptop
 
+def soil_properties_from_sitetype():
+    """
+    Based on Launiainen et al. 2022 Forests
+    soil_id 1 = herb-rich, 2 = mesic, 3 = sub-xeric, 4 = xeric,
+    5 = peatland, 6 = humus
+    """
+    psoil = {
+            'humus':
+                {
+                 'soil_id': 6,
+                 'poros': 0.9,
+                 'fc': 0.31,
+                 'wp': 0.11,
+                 'ksat': 1e-06,
+                 'beta': 4.0,
+                 'alpha': 8.54,
+                 'n': 1.32,
+                 'wr': 0.10,
+                 },
+            'herb-rich':
+                {
+                 'soil_id': 1,
+                 'poros': 0.58,
+                 'fc': 0.34,
+                 'wp': 0.11,
+                 'ksat': 1e-06,
+                 'beta': 4.0,
+                 'alpha': 4.06,
+                 'n': 1.17,
+                 'wr': 0.0,
+                 },
+            'mesic':
+                {
+                 'soil_id': 2,
+                 'poros': 0.55,
+                 'fc': 0.28,
+                 'wp': 0.08,
+                 'ksat': 1e-5,
+                 'beta': 4.0,
+                 'alpha': 4.48,
+                 'n': 1.20,
+                 'wr': 0.0,
+                 },
+            'sub-xeric':
+                {'soil_id': 3,
+                 'poros': 0.53,
+                 'fc': 0.24,
+                 'wp': 0.08,
+                 'ksat': 5e-5,
+                 'beta': 4.0,
+                 'alpha': 3.7,
+                 'n': 1.24,
+                 'wr': 0.0,
+                 },
+                
+            'xeric':
+                {'soil_id': 4,
+                 'poros': 0.48,
+                 'fc': 0.14,
+                 'wp': 0.04,
+                 'ksat': 5e-04,
+                 'beta': 4.0,
+                 'alpha': 3.8,
+                 'n': 1.42,
+                 'wr': 0.03,
+                },
+            'Peat':
+                {'soil_id': 0,
+                 'poros': 0.9,
+                 'fc': 0.41,
+                 'wp': 0.11,
+                 'ksat': 5e-5,
+                 'beta': 4.0,
+                 'n': 1.28,
+                 'wr': 0.00,
+                },
+            }      
+
+    return psoil
 
 def soil_properties():
     """ 

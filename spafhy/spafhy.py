@@ -68,7 +68,7 @@ VERSION 05.10.2018 / equations correspond to GMDD paper
 """
 
 
-def initialize(pgen, pcpy, pbu, ptop, psoil, gisdata, cpy_outputs=False, 
+def initialize(pgen, pcpy, pbu, ptop, soildata, gisdata, cpy_outputs=False, 
                   bu_outputs=False, top_outputs=False, flatten=False):
     """ 
     ******************** sets up SpaFHy  **********************
@@ -92,7 +92,7 @@ def initialize(pgen, pcpy, pbu, ptop, psoil, gisdata, cpy_outputs=False,
             LAI_decid [m2m-2]
             hc, canopy closure [m]
             fc, canopy closure fraction [-]
-            soil, soil type integer code 1-5
+            soildata - dict
             flowacc - flow accumulation [units]
             slope - local surface slope [units]
             
@@ -113,8 +113,8 @@ def initialize(pgen, pcpy, pbu, ptop, psoil, gisdata, cpy_outputs=False,
     # gisdata = create_catchment(pgen['catchment_id'], fpath=pgen['gis_folder'],
     #                           plotgrids=False, plotdistr=False)
 
-    # preprocess soildata --> dict used in BucketModel initialization    
-    soildata = preprocess_soildata(pbu, psoil, gisdata['soilclass'], gisdata['cmask'], pgen['spatial_soil'])
+    # # preprocess soildata --> dict used in BucketModel initialization    
+    # soildata = preprocess_soildata(pbu, psoil, gisdata['soilclass'], gisdata['cmask'], pgen['spatial_soil'])
 
     # inputs for CanopyGrid initialization: update pcpy using spatial data
     cstate = pcpy['state']

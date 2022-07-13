@@ -141,6 +141,8 @@ def initialize_netCDF(ID, fname, lat0, lon0, dlat, dlon, dtime=None):
     # gisdata
     soilclass = ncf.createVariable('/gis/soilclass', 'f4', ('dlat', 'dlon',))
     soilclass.units = 'soil type code [int]'
+    sitetype = ncf.createVariable('/gis/sitetype', 'f4', ('dlat', 'dlon',))
+    sitetype.units = 'sitetype code [int]'
     twi = ncf.createVariable('/gis/twi', 'f4', ('dlat', 'dlon',))
     twi.units = 'twi'
     LAI_conif = ncf.createVariable('/gis/LAI_conif', 'f4', ('dlat', 'dlon',))
@@ -252,7 +254,7 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
     """
     reads gis-data grids from selected catchments and returns numpy 2d-arrays
     IN:
-        fpath - filepathfolder (str)
+        fpath - filepath+name
         plotgrids - True plots grids
         plotdistr - True plots distributions
     OUT:
@@ -296,11 +298,11 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
     Create soiltype grid and masks for waterbodies, streams, peatlands and rocks
     """
     # Maastotietokanta water bodies: 1=waterbody
-    stream, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'vesielementit_prel.asc'))
+    stream, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'stream.asc'))
     stream[np.isfinite(stream)] = 1.0
     
     # maastotietokanta peatlandmask
-    peatm, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'suo.asc'))
+    peatm, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'peat.asc'))
     peatm[np.isfinite(peatm)] = 1.0
     #print(np.shape(peatm))
     
@@ -324,7 +326,7 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
     MediumTextured = [195315, 19531521, 195215, 195214, 195601, 195411, 195210] # tasta siirretty joitakin maalajikoodeja luokkaan CoarseTextured, jatkossa voisi luoda oman kallioluokan...
     Water = [195603]
 
-    gtk_s, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'soil_merged_pintamaa_cl.asc')) 
+    gtk_s, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'soilmap.asc')) 
 
     r, c = np.shape(gtk_s)
     soil = np.ravel(gtk_s)
@@ -352,7 +354,7 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
   
     """ stand data (MNFI)"""
     # stand volume [m3ha-1]
-    vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'tilavuus.asc'), setnans=False)
+    vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'vol.asc'), setnans=False)
     vol = vol*cmask
     
     # indexes for cells not recognized in mNFI
@@ -369,24 +371,24 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
     vol[ix_w] = np.NaN
 
     #pine volume [m3 ha-1]
-    p_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'manty.asc'))
+    p_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'vol_pine.asc'))
     p_vol = p_vol*cmask
     #spruce volume [m3 ha-1]
-    s_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'kuusi.asc'))
+    s_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'vol_spruce.asc'))
     s_vol = s_vol*cmask
     #birch volume [m3 ha-1]
-    b_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'koivu.asc'))
+    b_vol, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'vol_birch.asc'))
     b_vol = b_vol*cmask
     
 
     # basal area [m2 ha-1]
-    ba, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'ppa.asc') )
+    ba, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'ba.asc') )
     ba[ix_n] = nofor['ba']
     ba[ix_p] = opeatl['ba']
     ba[ix_w] = np.NaN
 
     # tree height [m]
-    height, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'keskipituus.asc'))
+    height, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'hc.asc'))
     height = 0.1*height  # m
     height[ix_n] = nofor['height']
     height[ix_p] = opeatl['height']
@@ -403,15 +405,15 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
 
 
     # stand age [yrs]
-    age, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'ika.asc'))
+    age, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'age.asc'))
     age[ix_n] = nofor['age']
     age[ix_p] = opeatl['age']
     age[ix_w] = np.NaN
 
     # leaf biomasses and one-sided LAI
-    bmleaf_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_manty_neulaset.asc'))
-    bmleaf_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_kuusi_neulaset.asc'))
-    bmleaf_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_lehtip_neulaset.asc'))
+    bmleaf_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bmleaf_pine.asc'))
+    bmleaf_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bmleaf_spruce.asc'))
+    bmleaf_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bmleaf_decid.asc'))
     bmleaf_pine[np.where(bmleaf_pine >= 32767)]=np.NaN
     bmleaf_spruce[np.where(bmleaf_spruce >= 32767)]=np.NaN
     bmleaf_decid[np.where(bmleaf_decid >= 32767)]=np.NaN
@@ -431,21 +433,53 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
     LAI_decid[ix_p] = opeatl['LAIdecid']
     LAI_decid[ix_w] = np.NaN
 
-    bmroot_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_manty_juuret.asc'))
-    bmroot_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_kuusi_juuret.asc'))
-    bmroot_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bm_lehtip_juuret.asc'))  
+    bmroot_pine, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bmroot_pine.asc'))
+    bmroot_spruce, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bmroot_spruce.asc'))
+    bmroot_decid, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'bmroot_decid.asc'))  
     bmroot = 1e-2*(bmroot_pine + bmroot_spruce + bmroot_decid)  # 1000 kg/ha
     bmroot[ix_n] = nofor['bmroot']
     bmroot[ix_p] = opeatl['bmroot']
     bmroot[ix_w] = np.NaN
     
     # site types
-    maintype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'paatyyppi.asc'))
+    maintype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'maintype.asc'))
     maintype = maintype*cmask
-    sitetype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'kasvupaikka.asc'))
+    sitetype, _, _, _, _ = read_AsciiGrid(os.path.join(fpath, 'sitetype.asc'))
     sitetype = sitetype*cmask
     
-        
+    sitetype_id = np.ones(np.shape(sitetype))*cmask
+    
+    #herb-rich
+    ixhr = np.where((maintype == 1) & (sitetype <= 2)) # OMaT, OMT
+    sitetype_id[ixhr] = 1
+    #mesic
+    ixm = np.where((maintype == 1) & (sitetype == 3)) # MT
+    sitetype_id[ixm] = 2
+    #sub-xeric
+    ixsx = np.where((maintype == 1) & (sitetype >= 4)) # VT
+    sitetype_id[ixsx] = 3
+    # xeric
+    ixx = np.where((maintype == 1) &  (sitetype >= 5)) # CT, CIT, lakimetsät
+    sitetype_id[ixx] = 4   
+    
+    # all peatlands assigned now to same class
+    ixp = np.where((maintype >= 2) & (maintype <= 4))
+    sitetype_id[ixp] = 0
+    
+    #mvmi_kasvupaikka = Site fertility class 2019 (1-10): 
+	#1=lehto tai vastaava suo (tvs) herb-rich forest /herb-rich hw-spruce swamps, pine mires, fens,  
+	#2=lehtomainen kangas tvs,herb-rich heat f. /V.myrtillus / tall sedge spruce swamps, tall sedge pine fens, tall sedge fens, 
+	#3=tuore kangas tvs, mesic heath f. / Carex clobularis / V.vitis-idaea swamps, Carex globularis pine swamps, low sedge (oligotrophic) fens,
+	#4=kuivahko kangas tvs, sub-xeric heath f./Low sedge, dwarf-shrub & cottongrass pine bogs, ombo-oligotrophic bogs,
+	#5= kuiva kangas tvs , xeric heath f. / S.fuscum pine bogs, ombotrophic and S.fuscum low sedge bogs.
+	#6=karukkokangas tvs, barren heath f. / 
+	#7=kalliomaa, hietikko tai vesijÃ¤ttÃ¶maa, rock,cliff or sand f. 
+	#8=lakimetsÃ¤, 
+	#9=tunturikoivikko, 
+	#10=avotunturi
+    #mvmi_paatyyppi = Site main class 2019 (1-4); 1=mineral soil, 2= spruce mire, 3= pine bog, 4=open peatland
+    #32766 is a missing value: the pixel belongs to forestry land but without satellite image cover
+    #32767 is a null value: the pixel does not belong to forestry land or is outside of the country
     
     # catchment outlet location and catchment mean elevation
     (iy, ix) = np.where(flowacc == np.nanmax(flowacc))
@@ -458,7 +492,7 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
                'LAI_spruce': LAI_spruce, 'LAI_conif': LAI_pine + LAI_spruce, 
                'LAI_decid': LAI_decid, 'bmroot': bmroot, 'ba': ba, 'hc': height,
                'vol': vol, 'p_vol':p_vol,'s_vol':s_vol,'b_vol':b_vol,'cf': cf, 
-               'age': age, 'maintype': maintype, 'sitetype': sitetype,
+               'age': age, 'sitetype': sitetype_id, 'maintype': maintype,
                'cellsize': cellsize, 'info': info, 'lat0': lat0, 'lon0': lon0, 'loc': loc,
               }   
 
@@ -490,14 +524,18 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
 
         plt.subplot(221)
         plt.imshow(soil); plt.colorbar(); plt.title('soiltype')
+        
+        plt.subplot(222)
+        plt.imshow(sitetype_id); plt.colorbar(); plt.title('sitetype')
+        
         mask = cmask.copy()*0.0
         mask[soil==4] = 1
         #mask[np.isfinite(rockm)] = 2
         mask[np.isfinite(stream)] = 3
 
-        plt.subplot(222)
-        plt.imshow(mask); plt.colorbar(); plt.title('masks')
         plt.subplot(223)
+        plt.imshow(mask); plt.colorbar(); plt.title('masks')
+        plt.subplot(224)
         LAIt = (LAI_pine+ LAI_spruce + LAI_decid) * ccmask
         plt.imshow(LAIt); plt.colorbar(); plt.title('LAI (m2/m2)')
         plt.subplot(224)
@@ -514,11 +552,12 @@ def create_catchment(fpath, plotgrids=False, plotdistr=False):
         plt.subplot(325)
         plt.imshow(age * ccmask); plt.colorbar(); plt.title('age (yr)')
         plt.subplot(322)
-        plt.imshow(1e-3*bmleaf_pine * ccmask); plt.colorbar(); plt.title('pine needles (kg/m2)')
+        plt.imshow(p_vol * ccmask); plt.colorbar(); plt.title('pine volume (m3/ha)')
         plt.subplot(324)
-        plt.imshow(1e-3*bmleaf_spruce * ccmask); plt.colorbar(); plt.title('spruce needles (kg/m2)')
+        plt.imshow(s_vol * ccmask); plt.colorbar(); plt.title('spruce vol. (m3/ha)')
         plt.subplot(326)
-        plt.imshow(1e-3*bmleaf_decid * ccmask); plt.colorbar(); plt.title('decid. leaves (kg/m2)')
+        plt.imshow(ba); plt.colorbar(); plt.title('ba (m2/ha)')
+        #plt.imshow(1e-3*bmleaf_decid * ccmask); plt.colorbar(); plt.title('decid. vol (m3/ha)')
 
     if plotdistr is True:
         twi0 = twi[np.isfinite(twi)]
@@ -578,7 +617,34 @@ def preprocess_soildata(pbu, psoil, soiltype, cmask, spatial=True):
 
         data['soilcode'] = soiltype
     return data
-    
+ 
+def sitetype_to_soilproperties(pbu, psoil, sitetype_id, cmask, spatial=True):
+    """
+    creates input dictionary for initializing BucketGrid
+    Args:
+        bbu - bucket parameters dict
+        psoil - soiltype dict
+        sitetype_id - soiltype code classified into 5 groups
+        cmask - catchment mask
+    """
+    # create dict for initializing soil bucket.
+    # copy pbu into sdata and make each value np.array(np.shape(cmask))
+    data = pbu.copy()
+    data.update((x, y*cmask) for x, y in data.items())
+
+    if spatial:
+        for key in psoil.keys():
+            c = psoil[key]['soil_id']
+            ix = np.where(sitetype_id == c)
+            data['poros'][ix] = psoil[key]['poros']
+            data['fc'][ix] = psoil[key]['fc']
+            data['wp'][ix] = psoil[key]['wp']
+            data['ksat'][ix] = psoil[key]['ksat']
+            data['beta'][ix] = psoil[key]['beta']
+            del ix
+
+        data['soilcode'] = sitetype_id
+    return data   
 
 """ ************ Reading and writing Ascii -grids ********* """   
  
@@ -839,8 +905,9 @@ def read_FMI_weather(ID, start_date, end_date, sourcefile, CO2=380.0):
     
     # get desired period
     fmi = fmi[(fmi.index >= start_date) & (fmi.index <= end_date)]
-#    if ID > 0:
-#        fmi = fmi[fmi['ID'] == ID]
+#
+    if ID > 0:
+        fmi = fmi[fmi['ID'] == ID]
     return fmi
 
 """ get forcing data from climate projections (120 years) """
